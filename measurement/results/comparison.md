@@ -5,80 +5,81 @@
 ## Run metadata
 
 - **Date:** _TBD_
-- **Model:** `claude-sonnet-4-5`
+- **Agent model:** `claude-sonnet-4-6`
+- **Judge model:** `claude-opus-4-7`
 - **Task set version:** _TBD_ (hash of `tasks.jsonl`)
-- **Architecture A commit:** _TBD_
-- **Architecture B commit:** _TBD_
+- **Architecture commits:** _TBD_ for each
 - **Runs per task:** 3
 - **Total API calls:** _TBD_
-- **Total measurement cost:** _TBD_
+- **Total measurement cost:** $_TBD_
 
 ## Headline numbers
 
-| Metric                          | Architecture A | Architecture B | Delta (B vs A)    |
-|---------------------------------|----------------|----------------|-------------------|
-| Mean input tokens per task      | _TBD_          | _TBD_          | _TBD_ (-X%)       |
-| Mean output tokens per task     | _TBD_          | _TBD_          | _TBD_ (±X%)       |
-| Mean total tokens per task      | _TBD_          | _TBD_          | _TBD_ (-X%)       |
-| Mean cost per task              | $_TBD_         | $_TBD_         | -$_TBD_ (-X%)     |
-| Cost per 10,000 tasks           | $_TBD_         | $_TBD_         | -$_TBD_           |
-| Task success rate               | _TBD_%         | _TBD_%         | _TBD_ percentage points |
-| Mean latency per task           | _TBD_s         | _TBD_s         | _TBD_             |
+| Architecture       | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
+|--------------------|--------------------------|------------------|------------------|--------------|--------------|
+| A — Naive RAG      | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| A+G — A w/ cache   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| C — Grep           | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| E — Hybrid RAG     | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
 
 ## Per-class breakdown
 
-The interesting question is whether the architectures perform differently on different task classes. If Architecture B is uniformly cheaper, the architectural choice is straightforward. If Architecture A wins on some classes and B wins on others, the right answer depends on which class the production traffic actually contains.
+The interesting question is whether the architectures perform differently on different task classes. If one architecture is uniformly best, the choice is straightforward. If they trade wins across classes, the right answer depends on production traffic shape.
 
 ### Pure policy tasks
 
-| Metric                          | Architecture A | Architecture B |
-|---------------------------------|----------------|----------------|
-| Mean tokens per task            | _TBD_          | _TBD_          |
-| Mean cost per task              | $_TBD_         | $_TBD_         |
-| Success rate                    | _TBD_%         | _TBD_%         |
+| Architecture       | Mean tokens | Mean cost | Success rate |
+|--------------------|-------------|-----------|--------------|
+| A                  | _TBD_       | $_TBD_    | _TBD_%       |
+| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
+| C                  | _TBD_       | $_TBD_    | _TBD_%       |
+| E                  | _TBD_       | $_TBD_    | _TBD_%       |
 
-**Observation:** _TBD — does the architecture B advantage hold here, or does RAG's flexibility win?_
+**Observation:** _TBD — does the contrarian C architecture hold its own on the case where RAG is theoretically strongest?_
 
 ### Pure transactional tasks
 
-| Metric                          | Architecture A | Architecture B |
-|---------------------------------|----------------|----------------|
-| Mean tokens per task            | _TBD_          | _TBD_          |
-| Mean cost per task              | $_TBD_         | $_TBD_         |
-| Success rate                    | _TBD_%         | _TBD_%         |
+| Architecture       | Mean tokens | Mean cost | Success rate |
+|--------------------|-------------|-----------|--------------|
+| A                  | _TBD_       | $_TBD_    | _TBD_%       |
+| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
+| C                  | _TBD_       | $_TBD_    | _TBD_%       |
+| E                  | _TBD_       | $_TBD_    | _TBD_%       |
 
-**Observation:** _TBD — both architectures should perform similarly here; if they don't, why?_
+**Observation:** _TBD — control class; all architectures should perform similarly. If they don't, why?_
 
 ### Mixed tasks
 
-| Metric                          | Architecture A | Architecture B |
-|---------------------------------|----------------|----------------|
-| Mean tokens per task            | _TBD_          | _TBD_          |
-| Mean cost per task              | $_TBD_         | $_TBD_         |
-| Success rate                    | _TBD_%         | _TBD_%         |
+| Architecture       | Mean tokens | Mean cost | Success rate |
+|--------------------|-------------|-----------|--------------|
+| A                  | _TBD_       | $_TBD_    | _TBD_%       |
+| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
+| C                  | _TBD_       | $_TBD_    | _TBD_%       |
+| E                  | _TBD_       | $_TBD_    | _TBD_%       |
 
-**Observation:** _TBD — this is where the comparison gets interesting._
+**Observation:** _TBD — this is where production traffic lives. Differences here matter most._
 
 ### Edge case tasks
 
-| Metric                          | Architecture A | Architecture B |
-|---------------------------------|----------------|----------------|
-| Mean tokens per task            | _TBD_          | _TBD_          |
-| Mean cost per task              | $_TBD_         | $_TBD_         |
-| Success rate                    | _TBD_%         | _TBD_%         |
+| Architecture       | Mean tokens | Mean cost | Success rate |
+|--------------------|-------------|-----------|--------------|
+| A                  | _TBD_       | $_TBD_    | _TBD_%       |
+| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
+| C                  | _TBD_       | $_TBD_    | _TBD_%       |
+| E                  | _TBD_       | $_TBD_    | _TBD_%       |
 
 **Observation:** _TBD — edge cases often expose failure modes that aggregate metrics hide._
 
 ## Token decomposition (Silicon Data methodology)
 
-| Component                       | Arch A (mean) | Arch B (mean) | Notes |
-|---------------------------------|---------------|---------------|-------|
-| System prompt                   | _TBD_         | _TBD_         |       |
-| Retrieved/injected context      | _TBD_         | _TBD_         | A: vector chunks. B: policy tool responses. |
-| User message                    | _TBD_         | _TBD_         | Should be identical across architectures. |
-| Tool call overhead (schemas)    | _TBD_         | _TBD_         | B has more tools, so schema overhead is higher per call. |
-| Response                        | _TBD_         | _TBD_         | Should be similar; if not, why? |
-| **Total**                       | _TBD_         | _TBD_         |       |
+| Component                       | A (mean) | A+G (mean) | C (mean) | E (mean) | Notes |
+|---------------------------------|----------|------------|----------|----------|-------|
+| System prompt                   | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Should be comparable across architectures |
+| Retrieved/injected context      | _TBD_    | _TBD_      | _TBD_    | _TBD_    | A/E: vector chunks. C: grep matches |
+| User message                    | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Identical across architectures |
+| Tool call overhead              | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Tool schemas differ per architecture |
+| Cache reads (A+G only)          | n/a      | _TBD_      | n/a      | n/a      | Negative cost contribution |
+| Response                        | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Should be similar; if not, why? |
 
 ## Variance and reliability
 
@@ -86,101 +87,91 @@ The interesting question is whether the architectures perform differently on dif
 - **Tasks excluded due to API errors:** _TBD_
 - **Tasks where architectures disagreed on success:** _TBD_
 
-If the coefficient of variation exceeds 10%, results should be treated as exploratory. Re-run with more samples per task.
+If CoV exceeds 10%, results are exploratory. Re-run with more samples.
 
 ## Comparison to published baselines
 
-The Silicon Data piece reports a reference workload of 3,150 input tokens + 400 output tokens per ticket. This corresponds to a particular RAG configuration (system prompt 500 + retrieved chunks 2,500 + user message 150 + response 400).
+The Silicon Data piece reports a reference workload of 3,150 input + 400 output tokens per ticket. This corresponds to a particular naive RAG configuration (system prompt 500 + chunks 2,500 + user 150 + response 400).
 
-Our Architecture A configuration: _TBD — compare to reference._
-Our Architecture B configuration: _TBD — compare to reference._
-
-The Silicon Data piece does not include tool call overhead or measure a bounded-tools alternative, so direct comparison is limited to the input/output totals.
-
-## Limitations of this measurement
-
-(See `METHODOLOGY.md` for the full discussion.)
-
-- Single model. Results may shift on smaller or reasoning models.
-- Small task set (15–20 tasks). Suggestive, not authoritative.
-- Single domain (airline customer support, English only).
-- No multi-turn dialogue measurement.
-- Excludes infrastructure cost, embedding cost, developer cost.
+Our Architecture A configuration: _TBD — compare to Silicon Data reference_
+Our Architecture A+G: _TBD — measure of how much caching collapses A_
+Our Architecture E: _TBD — production-grade RAG vs. naive_
+Our Architecture C: _TBD — non-semantic alternative_
 
 ## Confidence and known biases
 
-This section documents the adversarial review (per `METHODOLOGY.md`) of the published findings. It is mandatory before any number above is treated as a finding worth sharing.
+This section documents the adversarial review (per METHODOLOGY) of the published findings. Mandatory before any number above is treated as a finding worth sharing.
 
 ### Tuning effort review
 
-| Architecture     | Tuning applied                                                | Effort level | Honest assessment |
-|------------------|---------------------------------------------------------------|--------------|-------------------|
-| Architecture A   | _TBD: top-K choice, chunk strategy, threshold (if any)_       | _TBD_        | _TBD: was this comparable to the effort spent on Architecture B's curation?_ |
-| Architecture B   | _TBD: policy partitioning approach, tool naming, system prompt tightening_ | _TBD_ | _TBD: was this comparable to the effort spent on Architecture A's retrieval tuning?_ |
+| Architecture | Tuning applied                                                | Effort level | Honest assessment |
+|--------------|---------------------------------------------------------------|--------------|-------------------|
+| A            | _TBD: top-K choice, chunk strategy_                          | _TBD_        | _TBD_             |
+| A+G          | _TBD: caching configuration_                                 | _TBD_        | _TBD_             |
+| C            | _TBD: grep polish, keyword strategy in prompt_               | _TBD_        | _TBD_             |
+| E            | _TBD: BM25 weighting, reranker choice_                       | _TBD_        | _TBD_             |
 
-If the effort levels differ meaningfully, document the direction of the resulting bias here: _TBD_
+If effort levels differ meaningfully, document the direction of the resulting bias: _TBD_
 
 ### Task set bias review
 
-- **Do task phrasings map suspiciously to Architecture B tool names?** _TBD: yes / no, with examples_
-- **Does the class distribution reflect realistic production traffic?** _TBD: discussion_
-- **Do edge cases stress both architectures or just one?** _TBD: discussion_
+- **Do task phrasings favor any architecture?** _TBD: review each task for category-name leakage or grep-friendly vocabulary_
+- **Does the class distribution reflect realistic production traffic?** _TBD: 8 of 17 tasks are mixed — is that realistic for your domain?_
+- **Do edge cases stress all architectures or just some?** _TBD_
 
 ### Counterfactual reasoning
 
-For the headline finding (whichever direction it points), what would have to be true for it to reverse?
+For each headline finding, articulate what would have to be true for it to reverse.
 
-**If Architecture B is cheaper:**
-- A larger corpus with hundreds of policy classes would _TBD_
-- An open-ended question taxonomy (questions not anticipated during curation) would _TBD_
-- Multi-turn dialogue would _TBD_
-- A model with weaker tool-selection ability would _TBD_
+**If A+G is cheapest:** Under what conditions would caching's advantage evaporate?
+- Highly variable system prompts: _TBD_
+- Cache eviction at scale: _TBD_
+- Low repeat-prefix rate in production: _TBD_
 
-**If Architecture A is cheaper:**
-- A more concise policy curation in B would _TBD_
-- A tighter task scope mapping to fewer policy classes would _TBD_
-- Prompt caching enabled (which favors A's stable system prompt structure) would _TBD_
+**If C is cheapest but loses on success rate:** Document the cost/competence frontier explicitly: _TBD_
 
-**If success rates differ:**
-- The failure modes driving the gap are: _TBD_
-- Whether they are addressable in each architecture: _TBD_
+**If E wins overall:** Under what conditions would naive A or grep C be preferable?
+- Smaller corpus: _TBD_
+- Simpler queries: _TBD_
+- Different cost sensitivities: _TBD_
+
+**If success rates differ across architectures:** What failure modes drove the difference? Are they addressable in each architecture? _TBD_
 
 ### Steel-manning the null
 
 The strongest argument that this measurement shows nothing meaningful:
 
-> _TBD: write out the most compelling case that observed differences are artifacts of methodology choices, not genuine architectural properties. Then address it._
-
-If this argument cannot be addressed, the finding is not yet ready for publication.
+> _TBD: write out the most compelling case that observed differences are artifacts of methodology choices, not genuine architectural properties. Then address it. If unaddressed, the finding is not ready._
 
 ### Net confidence statement
 
-Based on the review above, the confidence level of the headline findings is: _TBD: high / medium / low / preliminary_
+Based on the review above, confidence level of headline findings: _TBD: high / medium / low / preliminary_
 
-The scope of validity is: _TBD: the conditions under which the result holds_
+Scope of validity: _TBD: the conditions under which the result holds_
 
 ## What this measurement supports
 
 Defensible claims based on these numbers:
 
-- Under the specified configuration and task set, Architecture B uses _TBD_% fewer input tokens than Architecture A.
-- The cost difference per task is $_TBD_, or $_TBD_ at the scale of 10,000 tasks.
-- Task success rates differ by _TBD_ percentage points; whether this difference is meaningful depends on the application's tolerance for the failure modes observed.
+- Under the specified configuration and task set, Architecture _X_ uses _TBD_% fewer input tokens than Architecture _Y_ per task
+- The cost difference per task is $_TBD_, or $_TBD_ at the scale of 10,000 tasks
+- Architecture _Z_ achieves _TBD_% task success rate, while _W_ achieves _TBD_%
+- Prompt caching (A vs A+G) reduces per-task cost by _TBD_% on this workload
 
 Claims this measurement does **not** support:
 
-- That one architecture is universally better.
-- That these numbers will hold in other domains.
-- That production deployments will see exactly these results (variability in real prompts, retrieval tuning, and tool implementations will shift the absolute numbers).
+- That one architecture is universally better
+- That these numbers will hold in other domains
+- That production deployments will see exactly these results
+- That the relative ranking holds at different model price points (single model measured)
 
 ## What I'd want to measure next
 
-> _Populated after v1 results are in._
+> _Populated after v1 results are in. Candidates listed in ROADMAP.md._
 
-Candidate v2 measurements:
-
-1. With prompt caching enabled.
-2. With a cheaper model (Haiku 4.5 or GPT-4o-mini) to test whether the architectural advantage interacts with model choice.
-3. With a larger task set (50-100 tasks) to tighten statistical confidence.
-4. Multi-turn dialog measurement (the architectural cost difference may compound across turns).
-5. With retrieval threshold tuning on Architecture A to give it the best possible showing.
+1. Architecture B (bounded structured tools) — if reviewers argue B and E differ meaningfully
+2. Architecture D (full corpus stuffed) — if A and E pay heavily for retrieval that corpus size doesn't justify
+3. Caching variants for E and C — to isolate whether caching's advantage is A-specific
+4. Cheaper model comparison — does the architectural advantage hold at lower price points?
+5. Multi-turn dialogue — caching effects and architectural differences likely compound
+6. Larger task set (50-100 tasks) — tighten statistical confidence

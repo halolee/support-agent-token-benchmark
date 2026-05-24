@@ -10,11 +10,61 @@ If you disagree with any choice below, the right move is to fork the methodology
 
 ## Model and configuration
 
-- **Model:** Claude Sonnet 4 (`claude-sonnet-4-5`)
+- **Agent model:** `claude-sonnet-4-6` (Sonnet 4.6 dateless ID; current mid-tier production default in 2026)
+- **Judge model:** `claude-opus-4-7` (Opus 4.7 dateless ID; current strongest model, used for LLM-as-judge scoring)
 - **Temperature:** 0.0 (for reproducibility; production deployments would typically use 0.3–0.7)
 - **Max tokens:** 1024 (response cap)
 - **Tools:** Native Anthropic function calling
-- **Cache:** Disabled for v1 measurements. The cache discount is a real production lever, but enabling it during measurement introduces variability that obscures the architectural comparison. A follow-up measurement with caching enabled is in scope for v2.
+- **Cache:** Disabled for Architectures A, C, E. Enabled for Architecture A+G (which exists specifically to measure the caching effect). Documented per-architecture.
+
+### Model ID stability
+
+Per Anthropic's model versioning policy, dateless IDs (e.g., `claude-sonnet-4-6`) are pinned snapshots, not evergreen pointers. The model behind a given ID does not change. When Anthropic ships an updated version, it gets a new ID.
+
+This means: the numbers in this benchmark are reproducible against the specific model version at time of measurement. Future model releases will not invalidate these numbers — they will just produce different numbers when re-measured against the newer model.
+
+## Modularity constraint
+
+This is a hard constraint on all architectures, designed to simulate enterprise org-chart reality.
+
+### The constraint
+
+The simulated organization has the following team boundaries:
+
+| System            | Owner Team        | Access pattern                                  |
+|-------------------|-------------------|-------------------------------------------------|
+| FAQ corpus        | Support Content   | AI Engineering accesses via tools exposed by Support Content |
+| Booking database  | Booking Systems   | AI Engineering accesses via tools exposed by Booking Systems |
+| Audit log         | Compliance        | AI Engineering writes via tools exposed by Compliance |
+
+### Rules every architecture must follow
+
+1. **No direct file system access.** AI Engineering's agent code does not read `corpus/swiss_faq.md` directly. It calls a tool. The tool implementation may live in the same repo (for v1 simplicity), but the *architectural boundary* is enforced — the agent only sees the tool's response.
+
+2. **No direct database access.** Same rule for `data/travel.sqlite`. The agent calls tools; the tools query the database.
+
+3. **No direct corpus mutation.** AI Engineering cannot pre-process or restructure the corpus to its preferred shape. If a transformation is needed (chunking for A, partitioning for B in v2), that transformation is owned by Support Content and exposed through whatever interface they publish.
+
+4. **Cross-team interfaces are explicit.** Every tool's input/output schema is part of the inter-team contract. Schema changes are inter-team negotiations, not silent updates.
+
+### What this constraint changes
+
+Without the constraint, the experiment would measure "what's the cheapest way to do this if one team owns everything" — which is the solo-founder context, not the enterprise context the article targets.
+
+With the constraint, the experiment measures "what's the cheapest way to do this when the org chart is load-bearing infrastructure." Absolute token numbers may be higher across the board (due to inter-team API overhead), but the relative comparison reflects realistic enterprise conditions.
+
+### How each architecture implements the constraint
+
+Brief summary; full implementation specs in each architecture's README.
+
+| Architecture | Inter-team interface                                                        |
+|--------------|------------------------------------------------------------------------------|
+| A (Naive RAG)| Support Content exposes `vector_search(query, k)`; AI Engineering consumes  |
+| A+G          | Same as A; caching is internal to the consumer side                         |
+| C (Grep)     | Support Content exposes `grep_corpus(keywords)`; AI Engineering consumes    |
+| E (Hybrid)   | Support Content exposes `hybrid_search(query, k)`; AI Engineering consumes  |
+
+Booking-related tools (`get_booking_status`, etc.) are identical across all architectures — they're exposed by Booking Systems regardless of which retrieval architecture is used.
 
 ## What gets counted
 
@@ -24,33 +74,50 @@ For each task run, the following are recorded from the API response:
 |--------------------------------|---------------------------------------------|
 | `input_tokens`                 | API usage object (provider-reported)        |
 | `output_tokens`                | API usage object (provider-reported)        |
-| `cache_creation_input_tokens`  | API usage object (zero in v1, cache off)    |
-| `cache_read_input_tokens`      | API usage object (zero in v1, cache off)    |
+| `cache_creation_input_tokens`  | API usage object (zero for A/C/E, non-zero for A+G) |
+| `cache_read_input_tokens`      | API usage object (zero for A/C/E, non-zero for A+G) |
 
 These raw numbers are then decomposed into five categories matching the [Silicon Data methodology](https://www.silicondata.com/blog/llm-cost-per-token):
 
-1. **System prompt tokens** — counted by tokenizing the system prompt string with the model's tokenizer before sending.
-2. **Retrieved/injected context tokens** — for Architecture A, this is the concatenated text of retrieved chunks. For Architecture B, this is the concatenated text of tool responses returning policy content.
-3. **User message tokens** — the customer inquiry string.
-4. **Tool call overhead tokens** — the tool schema JSON sent in every request (constant per architecture, varies per task only if available tools change mid-conversation).
-5. **Response tokens** — the model's output (assistant message + any structured tool call requests).
+1. **System prompt tokens** — counted via Anthropic's `client.beta.messages.count_tokens()` API on the system prompt string
+2. **Retrieved/injected context tokens** — counted via `count_tokens` on the concatenated tool response text
+3. **User message tokens** — counted via `count_tokens` on the user message
+4. **Tool call overhead tokens** — counted via `count_tokens` on the tool schema JSON sent in the request
+5. **Response tokens** — provider-reported `output_tokens`
 
-The sum of categories 1–4 should equal `input_tokens` reported by the API, within tokenizer-rounding variance. The runner asserts this equality and flags discrepancies above 2%.
+### Tokenizer note
+
+This project does NOT use `tiktoken`. `tiktoken` is OpenAI's tokenizer and will produce wrong counts for Anthropic models. Use Anthropic's official `count_tokens` API for all input decomposition.
+
+The sum of categories 1–4 should approximately equal `input_tokens` reported by the API, within small variance for how messages are framed for the API call. The runner asserts this equality within 5% tolerance and flags discrepancies.
 
 ## What does not get counted
 
-The following are deliberately excluded from the per-task cost number:
+The following are deliberately excluded from per-task cost numbers:
 
-- **Vector store infrastructure cost.** Hosting, embedding generation, re-indexing on policy updates. These are real costs but they amortize differently than per-call token costs.
-- **Embedding API calls for retrieval.** Architecture A makes one embedding call per query (embedding the user message to compare against the indexed chunks). At current pricing this is sub-cent per query and an order of magnitude below the inference cost, but it is not zero. Excluded from v1; flagged in `comparison.md`.
-- **Development cost.** Building Architecture A took longer than Architecture B (because of the embedding pipeline). Building Architecture B's policy lookup tools required curating policy text, which takes content team time. Both are real costs; neither is captured in per-task token measurements.
-- **Operational costs.** Monitoring, evaluation harnesses, on-call burden. Not measured.
+- **Vector store infrastructure cost.** Hosting, embedding storage, re-indexing on policy updates.
+- **Embedding API calls for retrieval.** Architecture A and E make embedding calls per query. At current pricing this is sub-cent per task and an order of magnitude below inference cost, but it is not zero. Excluded from v1; flagged in `comparison.md`.
+- **Curation cost.** Some architectures benefit from upfront curation (B's policy partitioning, E's reranking model selection). Not measured.
+- **Development cost.** Building Architecture E took longer than Architecture A. Not captured.
+- **Operational costs.** Monitoring, evaluation harnesses, on-call burden.
 
-The headline claim of this project is about *per-call token cost only*. Total cost of ownership is discussed qualitatively in `HANDOVER.md` and the companion article, but is not part of the measured comparison.
+The headline claim of this project is about *per-call inference token cost only*. Total cost of ownership is discussed qualitatively in `HANDOVER.md` and the companion article, but is not part of the measured comparison.
+
+## Latency measurement
+
+Latency is reported as **single-request wall-clock time** from the start of `runner.py`'s call to the SDK to the end of the final API response. This measures end-to-end agent latency including any internal tool-call loops.
+
+Specifically NOT measured:
+- Latency under concurrent load
+- Latency with rate limiting in effect
+- Network latency variance (single network path, single region)
+- Cold-start latency for vector store loading
+
+Latency is reported for completeness but is not a primary metric. The article's argument is about cost, not speed.
 
 ## Success criteria
 
-Each task in `tasks.jsonl` has an expected answer and a rubric. After both architectures produce responses, an LLM-as-judge (Claude Opus 4) scores each response on three dimensions:
+Each task in `tasks.jsonl` has an expected answer and a rubric. After all architectures produce responses, an LLM-as-judge (`claude-opus-4-7`) scores each response on three dimensions:
 
 1. **Factual correctness** — does the response state the right policy / data?
 2. **Citation accuracy** — when policy is invoked, is the cited source correct?
@@ -60,22 +127,24 @@ Each dimension is scored 0 (fail), 0.5 (partial), or 1 (pass). Task success requ
 
 A 10% random sample of judgments is manually reviewed to detect judge-model bias.
 
-A task that one architecture fails is excluded from the cost comparison for that architecture — comparing cost on tasks the architecture didn't actually solve would be misleading.
+A task that an architecture fails is excluded from that architecture's cost comparison for that task — comparing cost on tasks an architecture didn't actually solve would be misleading.
 
 ## Task set composition
 
-15–20 tasks total, distributed across four classes:
+~17 tasks total, distributed to reflect realistic production traffic:
 
-- **Pure policy** (5 tasks) — answer is entirely in the FAQ corpus, no booking data needed
-- **Pure transactional** (5 tasks) — answer requires booking data only, no policy lookup
-- **Mixed** (5 tasks) — requires both policy and booking data
-- **Edge case** (3–5 tasks) — requires conditional logic, policy-with-exceptions, or unusual booking states
+- **Pure policy** (3 tasks) — answer is entirely in the FAQ corpus
+- **Pure transactional** (3 tasks) — answer requires booking data only
+- **Mixed** (8 tasks) — requires both policy and booking data; this is where production traffic actually lives
+- **Edge case** (3 tasks) — conditional logic, exceptions, ambiguous routing
 
-Task IDs are stable across runs. New tasks are appended, never edited, to preserve historical comparability.
+The mixed-heavy distribution is deliberate. Real customer support traffic is overwhelmingly mixed — pure-policy or pure-transactional questions are minority cases. The distribution choice is itself a methodology decision worth surfacing.
+
+Task IDs are stable across runs. New tasks get new IDs. Edits create a new ID and deprecate the old one.
 
 ## Run protocol
 
-1. Both architectures execute the full task set in a single run, alternating tasks (A, B, A, B, …) to control for any time-of-day API latency variance.
+1. All architectures execute the full task set in a single run, alternating architectures per task (A, A+G, C, E, A, A+G, ...) to control for time-of-day API latency variance.
 2. Each task is run **three times** per architecture. The reported value is the median of the three runs. Variance is reported in `comparison.md`.
 3. If any run produces an API error, that run is retried up to twice. If it still fails, the task is flagged and excluded from that run's reported numbers.
 
@@ -88,35 +157,17 @@ git clone <repo>
 cd support-agent-token-benchmark
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
-python measurement/runner.py --architecture both --tasks measurement/tasks.jsonl --runs 3
+python measurement/runner.py --architectures a,a_cached,c,e --tasks measurement/tasks.jsonl --runs 3
 python measurement/runner.py --report
 ```
 
-Expected variance across independent runs of the full task set: under 5% on mean token counts, under 2% on cost (since cost is dominated by stable-prompt tokens, not output variability).
+Expected variance across independent runs of the full task set: under 5% on mean token counts.
 
 If your results differ from those published in `comparison.md` by more than the stated variance, possible causes include:
-
-- Model version drift (provider has updated the model under the same identifier)
-- Tokenizer changes
+- Model version drift (Anthropic shipped a new model under the same ID — unlikely given pinning policy, but check)
 - Task set has been edited locally
 - Different temperature or max_tokens setting
-
-## What this measurement supports
-
-Defensible claims:
-
-- "Under this task set, Architecture A consumes X% more input tokens than Architecture B per task."
-- "Per-task cost differs by $Y at Claude Sonnet 4 pricing."
-- "Architecture A succeeds on Z% of tasks; Architecture B succeeds on W%."
-
-Claims this measurement does **not** support:
-
-- "Bounded tools are always cheaper than RAG." (Sample size, task class scope, single model.)
-- "RAG is wasteful." (Cost-per-token is one input to total cost; not measured here.)
-- "Architecture B is production-ready." (No production hardening assessed.)
-- "These results generalize to other domains." (Single domain — airline customer support.)
-
-Honest framing of what the measurement is for: a *worked example* of how to compare two architectural patterns on the same task, with results that are suggestive for this domain and method-transferable to others.
+- Different network region
 
 ## Pre-publication adversarial review
 
@@ -132,33 +183,34 @@ The principle: a finding is publishable when I have honestly tried to make the *
 
 **Check 1 — Equal tuning effort.**
 
-Both architectures must have received their reasonable best showing. If Architecture A is at default settings and Architecture B is hand-curated, the comparison is asymmetric in ways that don't reflect production reality.
+All architectures must have received their reasonable best showing. If A is at default settings and C is hand-tuned, the comparison is asymmetric in ways that don't reflect production reality.
 
 Specifically required to verify:
-
-- [ ] Architecture A's retrieval is tuned (top-K, chunk size, threshold) — not running with defaults that may be suboptimal for the corpus
-- [ ] Architecture A's system prompt is comparable in care to Architecture B's policy curation
-- [ ] If Architecture B's policy text was curated, document how much effort went into curation. Architecture A should receive comparable effort on something — corpus cleaning, prompt tuning, or chunking strategy
+- [ ] A's retrieval is tuned (top-K, chunk size, threshold) — not running with defaults that may be suboptimal for the corpus
+- [ ] E's hybrid retrieval is tuned (vector vs. BM25 weighting, reranking model choice) — not running with defaults
+- [ ] C's grep tool is implemented with reasonable polish (case-insensitive, result truncation) — not a strawman implementation
+- [ ] A+G's caching configuration is set to maximize stable-prefix reuse, not just enabled with defaults
+- [ ] All architectures share an equivalently-tuned system prompt baseline (no architecture penalized by bloated prompt)
 - [ ] Document the effort asymmetry honestly if one cannot be removed
 
 **Check 2 — Task set neutrality.**
 
-The task set must not favor one architecture by accident of how tasks were written.
+The task set must not favor any architecture by accident of how tasks were written.
 
 Specifically required to verify:
-
-- [ ] Task phrasings do not map suspiciously cleanly to Architecture B's policy tool names. If a task says "rebooking policy" and Architecture B has a tool named `get_rebooking_policy`, the tool selection is trivial in a way that wouldn't hold in production. Tasks should be written in customer-style phrasings, not architect-style category names.
-- [ ] The class distribution (pure policy / pure transactional / mixed / edge case) reflects realistic production traffic, not a distribution chosen to favor one architecture
-- [ ] Edge cases include scenarios that stress *both* architectures' weak spots, not just one's
+- [ ] Task phrasings use customer-style language, not architect-style category names. A task that says "rebooking policy" maps too cleanly to a tool named `get_rebooking_policy`; phrase it as "I bought a one-way ticket and need to change the date" instead
+- [ ] Task phrasings don't use keyword vocabulary that suspiciously matches grep-friendly terms
+- [ ] The class distribution (pure policy / pure transactional / mixed / edge case) reflects realistic production traffic
+- [ ] Edge cases stress all architectures' weak spots, not just one's
 
 **Check 3 — Counterfactual reasoning.**
 
 For each headline finding, articulate what would have to be true for the result to reverse.
 
 Specifically required to verify:
-
-- [ ] If Architecture B is cheaper, document under what conditions Architecture A would close the gap or win (larger corpus, more policy classes, open-ended question taxonomy, multi-turn dialogue, different model)
-- [ ] If Architecture A is cheaper, document under what conditions Architecture B would close the gap or win (more concise policy curation, fewer policy classes, tighter task scope)
+- [ ] If A+G wins on cost, document under what conditions it would lose (highly variable system prompts, cache eviction, low repeat-prefix rate)
+- [ ] If C wins on cost but loses on success rate, document the cost/competence frontier explicitly
+- [ ] If E wins overall, document what would have to be true for naive A or grep C to be preferable (smaller corpus, simpler queries, different cost sensitivities)
 - [ ] If success rates differ, document what failure modes drove the difference and whether they are addressable in each architecture
 
 These counterfactuals are the scope-of-validity boundaries of the result. They are part of the published finding, not an asterisk on it.
@@ -169,20 +221,22 @@ If any check reveals a problem, three options in order of preference:
 
 1. **Fix it.** Re-tune the under-tuned architecture, rebalance the task set, re-run.
 2. **Document it as a measurement limitation.** Add it to "Limitations acknowledged" below, and clearly state which direction the bias likely runs.
-3. **Reframe the finding to match what was actually measured.** If the measurement actually shows "B wins under these specific conditions" rather than "B wins generally," publish the narrower claim.
+3. **Reframe the finding to match what was actually measured.** If the measurement actually shows "C wins under these specific conditions" rather than "C wins generally," publish the narrower claim.
 
-The disposition: I would rather publish a narrow defensible finding than a broad one I have to retract.
+The disposition: better to publish a narrow defensible finding than a broad one that gets retracted.
 
 ### Steel-manning the null
 
-In addition to the three checks above, write out the strongest version of "this measurement shows nothing meaningful" before publishing. What is the most compelling argument that the observed differences are artifacts of choices rather than genuine architectural properties? Include this argument in the published finding and address it. If it cannot be addressed, the finding is not yet ready.
+In addition to the three checks above, write out the strongest version of "this measurement shows nothing meaningful" before publishing. What is the most compelling argument that observed differences are artifacts of choices rather than genuine architectural properties? Include this argument in the published finding and address it. If it cannot be addressed, the finding is not yet ready.
 
 ## Limitations acknowledged
 
 These are limitations of the measurement as designed, separate from the adversarial review above. Both sections should be read together.
 
 1. **Single model.** Results may differ on smaller/cheaper models that are more sensitive to context length, or on reasoning models where thinking tokens dominate.
-2. **Single domain.** Airline customer support has a particular policy structure (finite, well-defined classes). Domains with open-ended policy taxonomies may favor RAG more.
-3. **Small task set.** 15–20 tasks is enough to be suggestive, not enough to be authoritative.
-4. **No multi-turn evaluation.** All tasks are single-turn. Multi-turn dialogue would change the comparison significantly.
-5. **No production load testing.** Latency under load, rate limit interactions, and concurrent request handling are not measured.
+2. **Single domain.** Airline customer support has a particular policy structure (finite, well-defined classes). Domains with open-ended policy taxonomies may favor different architectures.
+3. **Small task set.** ~17 tasks is enough to be suggestive, not enough to be authoritative.
+4. **Single-turn only.** All tasks are single-turn. Multi-turn dialogue would change the comparison significantly, particularly for caching effects.
+5. **No production load testing.** Latency reported is single-request wall clock, not under concurrent load.
+6. **English only.** No multi-language evaluation.
+7. **Single network path.** All requests from one region; no geographic variance measured.

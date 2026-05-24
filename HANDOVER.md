@@ -2,18 +2,18 @@
 
 **Status:** Draft for review
 **From:** AI Engineering
-**To:** Platform Operations, Support Operations, Compliance
-**Purpose:** Document the architecture, dependencies, and team coordination required to deploy the customer support agent to production.
+**To:** Platform Operations, Support Content, Booking Systems, Compliance
+**Purpose:** Document the architectures evaluated, the cross-team dependencies of each, and the recommended deployment path with honest trade-offs surfaced.
 
 ---
 
 ## 1. Project summary
 
-The customer support agent is designed to handle a defined class of customer questions end-to-end — policy lookups, booking status queries, and combinations of the two. The agent produces a customer-facing response, cites the policy used (where applicable), and logs the interaction for audit.
+The customer support agent handles a defined class of customer questions end-to-end — policy lookups, booking status queries, and combinations of the two. The agent produces a customer-facing response, cites the policy used (where applicable), and logs the interaction for audit.
 
-Two architectures have been implemented and measured. This document presents both, surfaces the cross-team dependencies of each, and recommends a deployment path.
+Four architectures have been implemented and measured under a uniform set of constraints. This document presents all four, surfaces the cross-team dependencies of each, and recommends a deployment path based on the measurements.
 
-The benchmark task set is in `measurement/tasks.jsonl`. The measurement results are in `measurement/results/comparison.md`.
+The benchmark task set is in `measurement/tasks.jsonl`. Measurement results are in `measurement/results/comparison.md`. The rationale for choosing these architectures (and deferring others) is in `ARCHITECTURE_RATIONALE.md`.
 
 ---
 
@@ -23,179 +23,189 @@ Customer support inquiries falling into four classes:
 
 | Class             | Example                                                    | Owner of source data       |
 |-------------------|------------------------------------------------------------|----------------------------|
-| Pure policy       | "What is your rebooking policy for one-way tickets?"       | Support Content / Legal Ops |
+| Pure policy       | "What's your policy on changing a one-way ticket?"         | Support Content / Legal Ops |
 | Pure transactional| "What's the status of my booking ABC123?"                  | Booking Systems            |
-| Mixed             | "I want to rebook flight XYZ — is that allowed?"           | Both                       |
+| Mixed             | "I want to change my flight XYZ — what are my options?"    | Both                       |
 | Edge case         | "Can I get a refund on my voucher-paid ticket?"            | Both (with conditional logic) |
 
 The agent must answer correctly, cite policy where invoked, and never invent policy text not present in the source.
 
 ---
 
-## 3. Architecture A — RAG + Tool Calls
+## 3. The modularity constraint
 
-The canonical pattern. Follows the LangGraph customer support tutorial.
+All architectures evaluated here respect a uniform constraint that simulates enterprise org-chart reality:
 
-### System diagram
+| System            | Owner Team        | Access pattern                                  |
+|-------------------|-------------------|-------------------------------------------------|
+| FAQ corpus        | Support Content   | AI Engineering accesses via tools exposed by Support Content |
+| Booking database  | Booking Systems   | AI Engineering accesses via tools exposed by Booking Systems |
+| Audit log         | Compliance        | AI Engineering writes via tools exposed by Compliance |
 
-```mermaid
-flowchart LR
-    User[Customer Inquiry] --> Agent[LLM Agent]
-    Agent -->|policy questions| VectorDB[(Vector Store<br/>swiss_faq.md)]
-    Agent -->|booking questions| BookingTool[Booking Status Tool]
-    Agent -->|booking questions| FlightTool[Flight Search Tool]
-    Agent -->|booking questions| HotelTool[Hotel Tool]
-    VectorDB -->|top-K chunks| Agent
-    BookingTool -->|JSON response| Agent
-    FlightTool -->|JSON response| Agent
-    HotelTool -->|JSON response| Agent
-    Agent --> Response[Customer Response]
-    Agent --> AuditLog[(Audit Log)]
+This constraint is non-negotiable. No architecture is allowed to "win" on tokens by collapsing boundaries the org chart has set. Every cross-team data flow is an explicit tool call, owned by the team that owns the data.
 
-    classDef supportTeam fill:#e1f5ff,stroke:#0288d1
-    classDef bookingTeam fill:#fff3e0,stroke:#f57c00
-    classDef complianceTeam fill:#f3e5f5,stroke:#7b1fa2
-    class VectorDB supportTeam
-    class BookingTool,FlightTool,HotelTool bookingTeam
-    class AuditLog complianceTeam
-```
-
-### Team dependencies
-
-| System              | Owner                  | What we need from them                                                          |
-|---------------------|------------------------|---------------------------------------------------------------------------------|
-| Vector store        | Support Content Team   | Ingestion pipeline, chunk strategy approval, policy update SLA, embedding model approval |
-| FAQ corpus          | Support Content + Legal Ops | Approval of policy text as customer-facing, change notification process    |
-| Booking tools       | Booking Systems Team   | Read API access, rate limit allowance, SLA for booking-status endpoint          |
-| Audit logging       | Compliance / SecOps    | Log schema approval, retention policy alignment, PII handling sign-off          |
-| Model inference     | AI Engineering         | (Internal)                                                                       |
-
-### Operational requirements
-
-- Vector store re-indexing when FAQ corpus changes (estimated 2× per quarter based on current policy update cadence)
-- Embedding model lifecycle (when do we re-embed if we upgrade the model)
-- Retrieval quality monitoring (drift detection, eval suite)
-- Tool endpoint health monitoring with circuit breaker
+The constraint matters because architecture decisions are constrained by who owns what. An architecture that requires AI Engineering to take ownership of policy text (for example) doesn't fail on engineering merit — it fails on organizational feasibility unless Support Content explicitly transfers ownership.
 
 ---
 
-## 4. Architecture B — Bounded Tools
+## 4. Architectures evaluated
 
-No vector store. Policy content is served through targeted lookup tools owned by AI Engineering, each returning curated text for a specific policy class.
+### Architecture A — Naive RAG
 
-### System diagram
+The pattern most tutorials show and most v1 deployments ship.
 
 ```mermaid
 flowchart LR
-    User[Customer Inquiry] --> Agent[LLM Agent]
-    Agent -->|policy questions| PolicyTools[Policy Lookup Tools<br/>get_rebooking_policy<br/>get_refund_policy<br/>get_baggage_policy<br/>...]
-    Agent -->|booking questions| BookingTool[Booking Status Tool]
-    Agent -->|booking questions| FlightTool[Flight Search Tool]
-    Agent -->|booking questions| HotelTool[Hotel Tool]
-    PolicyTools -->|curated text| Agent
-    BookingTool -->|JSON response| Agent
-    FlightTool -->|JSON response| Agent
-    HotelTool -->|JSON response| Agent
+    User[Customer Inquiry] --> Agent[LLM Agent<br/>AI Engineering]
+    Agent -->|policy questions| VectorTool[vector_search tool<br/>Support Content]
+    Agent -->|booking questions| BookingTools[Booking tools<br/>Booking Systems]
+    VectorTool -->|top-K chunks| Agent
+    BookingTools -->|JSON response| Agent
     Agent --> Response[Customer Response]
-    Agent --> AuditLog[(Audit Log)]
+    Agent --> AuditTool[audit_log tool<br/>Compliance]
 
     classDef supportTeam fill:#e1f5ff,stroke:#0288d1
     classDef bookingTeam fill:#fff3e0,stroke:#f57c00
     classDef complianceTeam fill:#f3e5f5,stroke:#7b1fa2
     classDef aiTeam fill:#e8f5e9,stroke:#388e3c
-    class PolicyTools aiTeam
-    class BookingTool,FlightTool,HotelTool bookingTeam
-    class AuditLog complianceTeam
+    class VectorTool supportTeam
+    class BookingTools bookingTeam
+    class AuditTool complianceTeam
+    class Agent aiTeam
 ```
 
-### Team dependencies
+**Inter-team interface:** Support Content publishes a vector store; AI Engineering's agent calls `vector_search(query, k=4)`.
 
-| System              | Owner                  | What we need from them                                                                            |
-|---------------------|------------------------|---------------------------------------------------------------------------------------------------|
-| Policy lookup tools | **AI Engineering (new)** | **Open question:** does AI Engineering own the policy text directly, or does Support Content publish to a structured policy registry that AI Engineering consumes? |
-| FAQ corpus          | Support Content + Legal Ops | Approval of policy text as customer-facing, change notification process                       |
-| Booking tools       | Booking Systems Team   | Read API access, rate limit allowance, SLA for booking-status endpoint                            |
-| Audit logging       | Compliance / SecOps    | Log schema approval, retention policy alignment, PII handling sign-off                            |
+**Operational requirements for Support Content:** Vector store re-indexing when FAQ corpus changes. Embedding model lifecycle management.
 
-### The unresolved boundary question
+### Architecture A+G — Naive RAG with prompt caching
 
-Architecture B is operationally simpler but introduces a governance question that Architecture A's vector-store approach answers by default:
+Identical architecture to A. Anthropic prompt caching enabled on the system prompt and stable retrieved chunks. The caching is internal to AI Engineering's consumption — Support Content's tool is unchanged.
 
-**Who owns the canonical policy text and is responsible for keeping the agent's responses synchronized with the published policy?**
+**What changes:** AI Engineering's per-request cost drops dramatically (up to 90% on cached prefixes). The architecture's inter-team boundaries don't change.
 
-In Architecture A, the vector store is owned by Support Content. When policy changes, they re-ingest. The boundary is clean: AI Engineering consumes; Support Content publishes.
+**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running A in production today have caching enabled. Comparing A without caching to anything else overstates A's real cost.
 
-In Architecture B, the policy text lives inside tools owned by AI Engineering. If Support Content updates policy without notifying AI Engineering, the agent silently serves stale text. Possible resolutions:
+### Architecture C — Grep
 
-- **Option 1:** Support Content publishes a structured policy registry (JSON/YAML) that AI Engineering's tools consume. New artifact, new ownership boundary.
-- **Option 2:** Support Content owns the policy lookup tools directly. Requires Support Content to develop/maintain code, which is outside their current operating model.
-- **Option 3:** AI Engineering owns the tools but subscribes to Support Content's change notifications. Process-based, brittle.
+```mermaid
+flowchart LR
+    User[Customer Inquiry] --> Agent[LLM Agent<br/>AI Engineering]
+    Agent -->|policy questions| GrepTool[grep_corpus tool<br/>Support Content]
+    Agent -->|booking questions| BookingTools[Booking tools<br/>Booking Systems]
+    GrepTool -->|matching lines| Agent
+    BookingTools -->|JSON response| Agent
+    Agent --> Response[Customer Response]
+    Agent --> AuditTool[audit_log tool<br/>Compliance]
 
-This question is not solvable inside AI Engineering. It requires alignment between Support Content, Legal Ops, and AI Engineering leadership.
+    classDef supportTeam fill:#e1f5ff,stroke:#0288d1
+    classDef bookingTeam fill:#fff3e0,stroke:#f57c00
+    classDef complianceTeam fill:#f3e5f5,stroke:#7b1fa2
+    classDef aiTeam fill:#e8f5e9,stroke:#388e3c
+    class GrepTool supportTeam
+    class BookingTools bookingTeam
+    class AuditTool complianceTeam
+    class Agent aiTeam
+```
+
+**Inter-team interface:** Support Content publishes a grep endpoint; AI Engineering's agent calls `grep_corpus(keywords, max_results=10)`.
+
+**Operational requirements for Support Content:** Lower than A. No vector store to maintain. No embedding model lifecycle. The corpus is served as text; the search is keyword-based.
+
+**Trade-off:** The agent has to pick the right keywords. The bet of this architecture is that LLMs are good enough at keyword extraction that semantic retrieval isn't necessary for many tasks.
+
+### Architecture E — Hybrid RAG
+
+The pattern mature production teams converge on.
+
+```mermaid
+flowchart LR
+    User[Customer Inquiry] --> Agent[LLM Agent<br/>AI Engineering]
+    Agent -->|policy questions| HybridTool[hybrid_search tool<br/>Support Content<br/>BM25 + Vector + Rerank]
+    Agent -->|booking questions| BookingTools[Booking tools<br/>Booking Systems]
+    HybridTool -->|reranked chunks| Agent
+    BookingTools -->|JSON response| Agent
+    Agent --> Response[Customer Response]
+    Agent --> AuditTool[audit_log tool<br/>Compliance]
+
+    classDef supportTeam fill:#e1f5ff,stroke:#0288d1
+    classDef bookingTeam fill:#fff3e0,stroke:#f57c00
+    classDef complianceTeam fill:#f3e5f5,stroke:#7b1fa2
+    classDef aiTeam fill:#e8f5e9,stroke:#388e3c
+    class HybridTool supportTeam
+    class BookingTools bookingTeam
+    class AuditTool complianceTeam
+    class Agent aiTeam
+```
+
+**Inter-team interface:** Support Content publishes a hybrid retrieval endpoint; AI Engineering's agent calls `hybrid_search(query, k=6)`.
+
+**Operational requirements for Support Content:** Highest of the four. Maintains vector store, BM25 index, reranking model, and the orchestration that combines them. Tuning is ongoing — vector/BM25 weights, reranking model selection, threshold management.
 
 ---
 
-## 5. Measurement results
+## 5. Architectures considered but deferred
+
+See `ARCHITECTURE_RATIONALE.md` for full discussion of why these are deferred to v2 rather than dropped.
+
+- **Architecture B — Bounded structured tools.** One tool per policy class. Deferred because conceptually close to E with curated chunks.
+- **Architecture D — Full corpus stuffed.** No retrieval. Deferred because SolDevelo's published finding makes the qualitative point.
+- **Architecture F — Fine-tuned model.** Different cost structure. Mentioned in article only.
+- **Architecture H — Deterministic routing.** Different engineering effort. Mentioned in article only.
+- **Architecture I — No LLM at all.** Rhetorical baseline. Mentioned in article only.
+
+---
+
+## 6. Measurement results
 
 > _To be populated after measurement runs. Structure below indicates what will be reported._
 
 ### Summary across all task classes
 
-| Metric                          | Architecture A | Architecture B | Delta |
-|---------------------------------|----------------|----------------|-------|
-| Mean total tokens per task      | _TBD_          | _TBD_          | _TBD_ |
-| Mean cost per task (Sonnet 4)   | _TBD_          | _TBD_          | _TBD_ |
-| Cost per 10,000 tasks           | _TBD_          | _TBD_          | _TBD_ |
-| Task success rate               | _TBD_          | _TBD_          | _TBD_ |
+| Architecture       | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
+|--------------------|--------------------------|------------------|------------------|--------------|--------------|
+| A — Naive RAG      | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| A+G — A w/ cache   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| C — Grep           | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| E — Hybrid RAG     | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
 
 ### Per-class breakdown
 
-> _The interesting question is whether the architectures perform differently on different task classes._
+The interesting question is whether different architectures suit different task classes. If one architecture is uniformly best, the choice is straightforward. If A+G wins on cost but loses on edge cases, or C wins on simple queries but fails on mixed ones, the right answer depends on production traffic shape.
 
-| Task class          | Arch A tokens | Arch B tokens | Arch A success | Arch B success |
-|---------------------|---------------|---------------|----------------|----------------|
-| Pure policy         | _TBD_         | _TBD_         | _TBD_          | _TBD_          |
-| Pure transactional  | _TBD_         | _TBD_         | _TBD_          | _TBD_          |
-| Mixed               | _TBD_         | _TBD_         | _TBD_          | _TBD_          |
-| Edge case           | _TBD_         | _TBD_         | _TBD_          | _TBD_          |
-
-### Token decomposition (Silicon Data methodology)
-
-| Component                       | Arch A (mean) | Arch B (mean) |
-|---------------------------------|---------------|---------------|
-| System prompt                   | _TBD_         | _TBD_         |
-| Retrieved/injected context      | _TBD_         | _TBD_         |
-| User message                    | _TBD_         | _TBD_         |
-| Tool call overhead              | _TBD_         | _TBD_         |
-| Response                        | _TBD_         | _TBD_         |
+> _Per-class tables to be populated._
 
 ---
 
-## 6. Risks and open questions
+## 7. Risks and open questions
 
-1. **Policy ownership in Architecture B** (see §4). Unresolved.
-2. **Audit trail equivalence.** Architecture A's vector retrieval logs which chunks were used; Architecture B's tool calls log which policy tool was invoked. Different evidence trails; compliance review needed to confirm both meet requirements.
-3. **Policy taxonomy completeness.** Architecture B assumes the policy taxonomy is closed (we know in advance which policy classes exist). If new policy categories emerge frequently, Architecture B requires code changes, while Architecture A absorbs them through re-indexing.
-4. **Multi-language support.** Both architectures need a strategy. RAG can use multilingual embeddings; bounded tools need per-language policy variants. Not assessed in this measurement.
-5. **Quality drift over time.** Neither architecture has been observed for long enough to assess maintenance burden. Architecture B has lower initial complexity but its quality depends entirely on policy text curation discipline.
+1. **Cache invalidation in A+G.** Prompt caching depends on stable prefixes. Any change to the system prompt or to retrieved chunk ordering breaks the cache. Document the conditions under which A+G's cost advantage holds vs. evaporates.
+2. **Grep result quality in C.** Grep's success depends on the LLM picking the right keywords. Document the failure modes — when does grep return nothing relevant, and how does the agent recover?
+3. **Audit trail equivalence.** Each architecture's audit trail looks different. Compliance review needed to confirm all four meet requirements.
+4. **Policy taxonomy completeness.** All measured architectures handle the existing FAQ corpus. New policy categories require:
+   - A and E: re-indexing (owned by Support Content)
+   - A+G: same as A, plus cache invalidation
+   - C: no action needed (grep always sees current corpus)
+5. **Quality drift over time.** Not assessed in v1 (single measurement, no longitudinal study).
 
 ---
 
-## 7. Recommended path forward
+## 8. Recommended path forward
 
 > _To be filled in after measurement results are known. The recommendation depends on the measured trade-offs._
 
 The recommendation will state:
 
-1. **Which architecture to deploy first**, with rationale grounded in the measured numbers and the operational/organizational reality of the current team boundaries.
-2. **What conditions would change the recommendation** — e.g., if Support Content adopts a structured policy registry, the calculus shifts toward Architecture B.
-3. **What we are explicitly not optimizing for in v1** — for example, multi-language support, voice channel, multi-turn dialog memory beyond a single session.
+1. **Which architecture to deploy first**, with rationale grounded in measured numbers and the operational/organizational reality of current team boundaries.
+2. **What conditions would change the recommendation** — e.g., if traffic patterns shift, if Support Content changes their operational model, if a different cost sensitivity dominates.
+3. **What we are explicitly not optimizing for in v1** — multi-turn, voice channel, multi-language.
+4. **Honest confidence level**, per the adversarial review in `comparison.md`.
 
-The recommendation is not a final decision. It is an input to the cross-team conversation that Support Operations, Compliance, and AI Engineering leadership need to have together.
+The recommendation is not a final decision. It is an input to the cross-team conversation that Support Operations, Compliance, Booking Systems, and AI Engineering leadership need to have together.
 
 ---
 
-## 8. Sign-offs required
+## 9. Sign-offs required
 
 | Role                          | Reviewer | Status |
 |-------------------------------|----------|--------|
@@ -210,6 +220,7 @@ The recommendation is not a final decision. It is an input to the cross-team con
 ## Appendix — Reference materials
 
 - Measurement methodology: `METHODOLOGY.md`
-- Architecture A implementation notes: `architecture_a_rag/README.md`
-- Architecture B implementation notes: `architecture_b_bounded/README.md`
-- Companion article: [link to published article when ready]
+- Architecture rationale (why these, why not others): `ARCHITECTURE_RATIONALE.md`
+- Roadmap (v1 scope, v2 deferred, beyond): `ROADMAP.md`
+- Per-architecture implementation notes: `architectures/<arch>/README.md`
+- Companion article: [link when published]

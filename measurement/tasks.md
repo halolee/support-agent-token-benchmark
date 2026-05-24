@@ -1,6 +1,6 @@
 # Benchmark Task Set
 
-This document specifies the structure and contents of `tasks.jsonl`, the benchmark task set used to evaluate both architectures.
+Specification for `tasks.jsonl`, the benchmark task set used to evaluate all architectures.
 
 ## File format
 
@@ -10,80 +10,98 @@ This document specifies the structure and contents of `tasks.jsonl`, the benchma
 
 ```json
 {
-  "task_id": "POL-001",
-  "class": "pure_policy",
-  "user_message": "What's your policy on rebooking one-way tickets?",
-  "expected_answer_summary": "Rebooking one-way tickets is allowed under specific conditions: ticket must be active, must not be barter/voucher-paid (with exceptions), must have flight segments with the same airline.",
-  "expected_citations": ["swiss_faq.md#rebooking"],
-  "expected_tool_calls": {
-    "architecture_a": ["lookup_policy"],
-    "architecture_b": ["get_rebooking_policy"]
-  },
+  "task_id": "MIX-001",
+  "class": "mixed",
+  "user_message": "I bought a one-way ticket to Zurich last month and need to push my departure back by two days — what are my options here?",
+  "expected_answer_summary": "The agent should look up the user's booking, check ticket type and eligibility, then apply the rebooking policy. One-way rebooking is allowed under conditions: ticket must be active, must not be voucher-paid (with exceptions), must have segments with the same airline. Response should cite the relevant policy section.",
+  "expected_citations": ["rebooking"],
+  "policy_classes_invoked": ["rebooking"],
+  "booking_data_required": true,
   "rubric": {
-    "factual_correctness": "Response correctly states the conditions for one-way ticket rebooking.",
-    "citation_accuracy": "Response cites the rebooking policy from the FAQ.",
-    "no_fabrication": "Response does not invent policy not present in the source."
+    "factual_correctness": "Response correctly identifies whether the user's ticket is eligible for rebooking and states the conditions.",
+    "citation_accuracy": "Response cites the rebooking policy.",
+    "no_fabrication": "Response does not invent policy clauses not in the source."
   }
 }
 ```
 
+## Critical rule: task phrasing must not favor any architecture
+
+This is the most important rule for task authors. Per METHODOLOGY §"Check 2," task phrasings must use customer-style language, not architect-style category names.
+
+**Wrong (favors structured-tool architectures):**
+```json
+"user_message": "What's your policy on rebooking one-way tickets?"
+```
+This phrasing uses the exact category name a structured-tool architecture might expose as a tool (`get_rebooking_policy`). A real customer would not phrase it this way. Using this phrasing in the benchmark gives bounded-tool architectures a free signal that doesn't reflect production conditions.
+
+**Right (customer-style phrasing):**
+```json
+"user_message": "I bought a one-way ticket to Zurich last month and need to push my departure back by two days — what are my options here?"
+```
+This phrasing forces the agent to *figure out* that this is a rebooking question. The architecture's retrieval mechanism has to do real work.
+
+The rule extends to grep-friendly vocabulary too. A task phrased to use the exact keywords that appear in the policy text gives grep an unfair advantage. Customer language is colloquial, often imprecise, and rarely matches the formal policy vocabulary directly.
+
+The `policy_classes_invoked` and `booking_data_required` fields are metadata for analysis (what *should* the agent retrieve), not for the architecture to read. The agent only sees `user_message`.
+
 ## Task classes
 
-### Pure policy (5 tasks)
+### Pure policy (3 tasks)
 
-Questions answerable entirely from the FAQ corpus, no booking data required. Architecture A retrieves chunks; Architecture B calls a single policy tool.
+Questions answerable entirely from the FAQ corpus, no booking data required.
 
-Examples to write:
+Examples (customer-phrased):
+- POL-001: "If my flight is cancelled by the airline, do I just get my money back automatically or do I need to ask?"
+- POL-002: "I'm bringing a stroller and a car seat for my baby — does that count against my baggage allowance?"
+- POL-003: "How long before takeoff do I need to be at the gate? Some airlines say 30 minutes, some say 45 — what's yours?"
 
-- POL-001: One-way ticket rebooking policy
-- POL-002: Refund eligibility for cancelled flights
-- POL-003: Baggage allowance for economy fare
-- POL-004: Check-in cutoff times
-- POL-005: Voucher policy and exceptions
+### Pure transactional (3 tasks)
 
-### Pure transactional (5 tasks)
+Questions requiring booking data only, no policy lookup. Control class — all architectures should perform similarly.
 
-Questions requiring booking data lookup only, no policy. Both architectures should perform similarly; this class is a control.
+Examples:
+- TXN-001: "Can you check what time my flight ABC123 leaves tomorrow?"
+- TXN-002: "I'm looking at flights from Zurich to New York on December 15 — what's available?"
+- TXN-003: "How much did I end up paying total for booking XYZ?"
 
-Examples to write:
+### Mixed (8 tasks)
 
-- TXN-001: Status of a specific booking
-- TXN-002: Flights available between two airports on a date
-- TXN-003: Hotels available in a city for a date range
-- TXN-004: Cars available at an airport
-- TXN-005: Total cost of a specific booking
+Questions requiring both policy and booking data. This is where production traffic actually lives, and where architectural differences become most visible. Weighted heavily for realistic distribution.
 
-### Mixed (5 tasks)
+Examples (customer-phrased, avoid mapping to category names):
+- MIX-001: "I bought a one-way ticket to Zurich last month and need to push my departure back by two days — what are my options here?"
+- MIX-002: "My flight got cancelled, the one I had on booking ABC. Am I going to get my money back or do they put me on a different flight?"
+- MIX-003: "I'm flying economy on flight XYZ next week — can I bring a guitar as carry-on or does that have to go below?"
+- MIX-004: "I want to cancel my trip entirely and rebook for next month — is that a thing I can do or do I lose the money?"
+- MIX-005: "I paid for booking DEF with a voucher from a previous cancelled flight — can I still change the date online or do I need to call someone?"
+- MIX-006: "I have a connecting flight in Frankfurt with only 45 minutes between landing and takeoff — is that going to be a problem if the first leg is delayed?"
+- MIX-007: "My daughter is 16 and traveling alone next month on booking GHI — is there anything I need to set up or sign?"
+- MIX-008: "I need to add my frequent flyer number to my existing booking JKL — can I do that online or is it too late?"
 
-Questions requiring both policy and booking data. The model must determine that it needs to look up booking state AND apply policy. This is where the architectures' differences become most visible.
+### Edge case (3 tasks)
 
-Examples to write:
+Tests conditional policy logic, exceptions, ambiguous routing. Often expose failure modes that aggregate metrics hide.
 
-- MIX-001: "Can I rebook my flight ABC123?" — needs booking state plus rebooking policy
-- MIX-002: "Am I eligible for a refund on booking XYZ?" — needs booking state plus refund policy
-- MIX-003: "Does my baggage fit the allowance for my flight?" — needs booking class plus baggage policy
-- MIX-004: "Can I cancel and rebook to a different date?" — needs booking state plus cancellation + rebooking policy
-- MIX-005: "Is my voucher-paid booking eligible for online rebooking?" — needs booking payment method plus policy with exception
+Examples:
+- EDGE-001: A question whose answer depends on conditions in the booking data that aren't explicitly asked about (tests whether agent retrieves enough context)
+- EDGE-002: A question whose policy answer has an exception the agent must surface (tests handling of conditional clauses)
+- EDGE-003: A question that's ambiguous between two policy classes (tests how each architecture's retrieval handles ambiguity)
 
-### Edge case (3–5 tasks)
+## Why these classes and this distribution
 
-Questions that test conditional policy logic, policy-with-exceptions, or unusual booking states. These often expose failure modes that aggregate metrics hide.
+The four classes expose where architectural choice actually matters:
 
-Examples to write:
+- **Pure policy** is the case where RAG is theoretically strongest — semantic search over unstructured text. If grep matches RAG here, the bet is validated.
+- **Pure transactional** is a control — neither architecture's policy retrieval is exercised, so differences should be small and attributable to system prompt size only.
+- **Mixed** is where production traffic actually lives. Weighted heavily (8 of ~17) because the comparison should reflect real distribution.
+- **Edge case** is where confident-sounding wrong answers happen. Important for safety; often the deciding factor for whether an agent ships.
 
-- EDGE-001: Customer asks about a policy that has changed recently (tests both architectures' handling of stale content)
-- EDGE-002: Customer asks about a booking that doesn't exist (tests error handling)
-- EDGE-003: Customer asks about a policy with multiple conditional clauses (tests reasoning over policy text)
-- EDGE-004: Customer asks a question outside the agent's scope (tests refusal behavior)
-- EDGE-005: Customer asks in a way that's ambiguous between two policy classes (tests Architecture B's tool selection)
-
-## Task IDs are stable
-
-Once a task ID is published in a release, the task content is frozen. New tasks get new IDs (POL-006, MIX-006, etc.). Edits create a new task ID and deprecate the old one. This preserves comparability across versions.
+The mixed-heavy distribution is deliberate. Real customer support traffic is overwhelmingly mixed; pure-class questions are minority cases.
 
 ## Rubric scoring
 
-Each task is scored on three dimensions by an LLM-as-judge (Claude Opus 4):
+Each task is scored on three dimensions by an LLM-as-judge (`claude-opus-4-7`):
 
 | Dimension              | 0 (fail)                                          | 0.5 (partial)                                    | 1 (pass)                                          |
 |------------------------|---------------------------------------------------|--------------------------------------------------|---------------------------------------------------|
@@ -95,24 +113,18 @@ A task is **successful** only if it scores 1.0 on all three dimensions.
 
 A 10% random sample of judge decisions is manually reviewed to detect judge bias.
 
-## Why these classes
+## Task IDs are stable
 
-The four classes are chosen to expose where the architectural choice actually matters:
-
-- **Pure policy** is the case where RAG is theoretically strongest — semantic search over unstructured text. If Architecture B wins here, the bet (that the policy taxonomy is closed enough for structured retrieval to work) is validated.
-- **Pure transactional** is a control — neither architecture's policy-retrieval design is exercised, so token differences should be small and attributable to system prompt size only.
-- **Mixed** is where production traffic actually lives. Real customers rarely ask pure policy or pure transactional questions; they ask "can I do X with my booking Y" which requires both.
-- **Edge case** is where confident-sounding wrong answers happen. Important for safety, often the deciding factor for whether an agent ships at all.
-
-The class distribution matches roughly what customer support data tends to look like in practice — heavy on mixed, lighter on pure policy or pure transactional.
+Once a task ID is published in a release, the task content is frozen. New tasks get new IDs. Edits create a new ID and deprecate the old one. This preserves comparability across versions.
 
 ## Building the actual task set
 
-The placeholders above are skeletons. The actual tasks need to be written by:
+The examples above are seed phrasings. The actual tasks need to be written by:
 
-1. Reading `corpus/swiss_faq.md` and identifying real policy classes
-2. Reading `data/travel.sqlite` schema and identifying real bookings to reference
-3. Writing tasks that are answerable, unambiguous, and have clear success criteria
+1. Reading `corpus/swiss_faq.md` (after Phase 1 corpus inventory) and identifying real policy classes
+2. Reading `data/travel.sqlite` schema and identifying real bookings to reference (or designing tasks that work against the actual data)
+3. Writing tasks in customer-style language — the kind of phrasing that would actually arrive in a support inbox
 4. Validating each task by manually answering it yourself before adding to the set
+5. Re-reading each task with Check 2 in mind: does this phrasing favor any architecture?
 
-The task set is small (15-20 tasks) precisely so this manual validation is tractable.
+The task set is small (~17 tasks) precisely so this manual validation is tractable.
