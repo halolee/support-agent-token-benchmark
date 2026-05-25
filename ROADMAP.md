@@ -98,6 +98,24 @@ Airline customer support has particular properties (finite policy taxonomy, stru
 
 Each domain would be its own v-N.
 
+### Corpus and data evolution as an experimental axis
+
+Run the same task set against a "before" corpus/DB and an "after" corpus/DB to measure how each architecture absorbs change. Adaptation cost becomes a comparison dimension alongside per-task token cost.
+
+The shape: v1 measures cost and success on a static dataset. It doesn't measure what it takes to *update* each architecture when policy text changes or new policy classes are added. That's a real architectural trade-off:
+
+- Architecture A / E need re-indexing (Support Content's operational burden)
+- Architecture A+G needs cache invalidation + re-indexing
+- Architecture C needs no code change if the corpus just grows; needs code change only if the policy taxonomy changes the *kind* of question to ask
+
+**Trigger condition:** if v1 results show C competitive on cost/success against A and E on the static dataset, the natural follow-up question is whether C's adaptation story holds when the corpus changes. Without this axis, v1 understates C's case if C is genuinely cheaper to evolve, and overstates C's case if C silently misses new policy categories.
+
+**Estimated effort:** significant. Requires (a) a second corpus reflecting realistic policy expansion, (b) re-running the full task set, (c) potentially new tasks specifically targeting the new policy classes, (d) re-indexing/adaptation-cost instrumentation.
+
+**Origin:** surfaced during Phase 1 Step 0 corpus inventory. The bucket's `travel.sqlite` (Apr 23 2024, aviation-only) → `travel2.sqlite` (Apr 30 2024, multi-domain) evolution suggested the experimental design, though those two files aren't directly usable as a before/after pair (different schemas, not a migration test).
+
+**Good fit for an open-source contributor.** Independent of the other Beyond-v2 items; doesn't require training infrastructure (unlike F) or a new component to build (unlike H). The instrumentation hook is the existing `setup_*` script in each architecture; the rest is task-set construction and a second measurement pass.
+
 ## Decision log
 
 Significant scope decisions and their rationale:
@@ -109,6 +127,7 @@ Significant scope decisions and their rationale:
 | Design phase | Added A+G (caching variant) | Without it, the comparison overstates RAG's real production cost. Most teams running A in production have caching enabled. |
 | Design phase | Enforced modularity constraint across all architectures | Simulates enterprise org-chart reality. Without it, the experiment measures startup-context architectures, not enterprise ones. |
 | Design phase | Phased build (foundation → core → variant → optional) | Allows shipping a working artifact at each phase. Supports parallel execution with job hunt. |
+| 2026-05-25 | Added "corpus/data evolution axis" to Beyond v2 | Surfaced during Phase 1 Step 0 corpus inventory. The bucket's travel→travel2 evolution suggested an adaptation-cost experimental axis distinct from per-call token cost. Flagged as a good contributor fit for the open-source v2+. |
 
 ## How this document gets updated
 

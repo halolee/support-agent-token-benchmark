@@ -40,6 +40,11 @@ architectures_deferred/*/vector_store/
 # BGE-M3 / HuggingFace model cache (if HF_HOME is set locally)
 .cache/huggingface/
 
+# Downloaded reference artifacts (fetch via Phase 1 Step 0 — see BUILD_PLAN)
+# travel.sqlite is ~110MB (over GitHub's per-file limit); source URLs + hashes are recorded in notebooks/00_corpus_inventory.ipynb.
+corpus/*.md
+data/*.sqlite
+
 # Measurement output (keep results/comparison.md but ignore raw JSON dumps)
 measurement/results/*.json
 measurement/results/raw_runs/
