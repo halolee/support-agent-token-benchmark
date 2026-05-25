@@ -33,8 +33,12 @@ wheels/
 *.swo
 .DS_Store
 
-# Vector store
-architecture_a_rag/vector_store/
+# Vector stores (per-architecture)
+architectures/*/vector_store/
+architectures_deferred/*/vector_store/
+
+# BGE-M3 / HuggingFace model cache (if HF_HOME is set locally)
+.cache/huggingface/
 
 # Measurement output (keep results/comparison.md but ignore raw JSON dumps)
 measurement/results/*.json

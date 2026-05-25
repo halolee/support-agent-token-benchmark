@@ -12,6 +12,7 @@ If you disagree with any choice below, the right move is to fork the methodology
 
 - **Agent model:** `claude-sonnet-4-6` (Sonnet 4.6 dateless ID; current mid-tier production default in 2026)
 - **Judge model:** `claude-opus-4-7` (Opus 4.7 dateless ID; current strongest model, used for LLM-as-judge scoring)
+- **Embedding model:** `BAAI/bge-m3` (MIT-licensed, self-hosted, the 2026 enterprise default for self-hosted RAG). Used by Architectures A, A+G, and E. This is a deliberate alignment with enterprise self-hosted practice rather than API-based embedding services. The choice eliminates data egress concerns that would arise from sending corpus content to third-party embedding APIs — a hard constraint in regulated industries and a soft constraint in most enterprise contexts. Retrieval quality is comparable to commercial APIs (text-embedding-3-large) on most public benchmarks.
 - **Temperature:** 0.0 (for reproducibility; production deployments would typically use 0.3–0.7)
 - **Max tokens:** 1024 (response cap)
 - **Tools:** Native Anthropic function calling
@@ -22,6 +23,17 @@ If you disagree with any choice below, the right move is to fork the methodology
 Per Anthropic's model versioning policy, dateless IDs (e.g., `claude-sonnet-4-6`) are pinned snapshots, not evergreen pointers. The model behind a given ID does not change. When Anthropic ships an updated version, it gets a new ID.
 
 This means: the numbers in this benchmark are reproducible against the specific model version at time of measurement. Future model releases will not invalidate these numbers — they will just produce different numbers when re-measured against the newer model.
+
+### API vs self-hosted choices
+
+The agent inference model is an API (Anthropic); the embedding model is self-hosted (BGE-M3). This asymmetry is deliberate.
+
+- **Embedding** sees the full corpus during indexing and the user message at query time. Sending corpus content to a third-party API creates data egress exposure that conflicts with the enterprise framing this experiment targets. Self-hosted is the correct default for embedding.
+- **Inference** sees only the assembled prompt (system prompt + retrieved context + user message) at the moment of the call. The data exposure profile is narrower, and the cost-vs-quality tradeoff at this scale favors API-based inference.
+
+Architecture E's reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is also self-hosted, consistent with the embedding choice — the inter-team interface Support Content publishes runs entirely within a perimeter Support Content controls.
+
+If a reader of the published article asks "why API for inference but self-hosted for embedding," the answer is: different data exposure profile, different cost-vs-quality tradeoff, different operational complexity. The framework supports both choices honestly.
 
 ## Modularity constraint
 
@@ -85,7 +97,7 @@ Forbidden in the audit payload (would introduce architectural variance):
 
 This is a deliberate methodology choice. Different architectures *could* log different things in production (Compliance might want chunk-level audit trails for RAG and keyword traces for grep). For the measurement, uniform payload removes the variable.
 
-audit_log calls and their token cost are **excluded** from the per-task token decomposition, same as embedding API calls. Their cost is approximately constant across architectures, so including or excluding them does not change relative comparisons.
+audit_log calls and their token cost are **excluded** from the per-task token decomposition, same as embedding compute. Their cost is approximately constant across architectures, so including or excluding them does not change relative comparisons.
 
 ### Conceptual vs. structural boundaries
 
@@ -123,8 +135,8 @@ The sum of categories 1–4 should approximately equal `input_tokens` reported b
 The following are deliberately excluded from per-task cost numbers:
 
 - **Vector store infrastructure cost.** Hosting, embedding storage, re-indexing on policy updates.
-- **Embedding API calls for retrieval.** Architecture A and E make embedding calls per query. At current pricing this is sub-cent per task and an order of magnitude below inference cost, but it is not zero. Excluded from v1; flagged in `comparison.md`.
-- **Audit log API calls.** Every architecture writes to Compliance's `audit_log` tool. The audit payload is uniform across architectures (see "Audit log specification" below) so the token cost would be approximately identical across architectures. To avoid conflating retrieval cost with logging cost, audit_log calls are excluded from the per-task token decomposition entirely. Same pattern as embedding API calls.
+- **Embedding compute.** Architectures A and E run BGE-M3 inference locally (CPU) for query embedding and during one-time corpus indexing. Cost is local CPU time, not API tokens. Excluded from per-task token decomposition; flagged in `comparison.md`.
+- **Audit log API calls.** Every architecture writes to Compliance's `audit_log` tool. The audit payload is uniform across architectures (see "Audit log specification" below) so the token cost would be approximately identical across architectures. To avoid conflating retrieval cost with logging cost, audit_log calls are excluded from the per-task token decomposition entirely. Same pattern as embedding compute.
 - **Curation cost.** Some architectures benefit from upfront curation (B's policy partitioning, E's reranking model selection). Not measured.
 - **Development cost.** Building Architecture E took longer than Architecture A. Not captured.
 - **Operational costs.** Monitoring, evaluation harnesses, on-call burden.
@@ -268,3 +280,4 @@ These are limitations of the measurement as designed, separate from the adversar
 5. **No production load testing.** Latency reported is single-request wall clock, not under concurrent load.
 6. **English only.** No multi-language evaluation.
 7. **Single network path.** All requests from one region; no geographic variance measured.
+8. **No adversarial security modeling.** The adversarial review section addresses measurement bias, not security threats. Prompt injection (direct from user query), indirect prompt injection (via poisoned corpus chunks), and tool-input attacks are not modeled. The corpus is assumed trusted; the user input is assumed cooperative. A production deployment would need an explicit threat model. See `HANDOVER.md` §"Security and governance scope" for the full enumeration of out-of-scope concerns.

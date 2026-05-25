@@ -31,7 +31,7 @@ The vector store itself (`vector_store/` directory) is conceptually owned by Sup
 
 ### Retrieval
 
-- **Embedding model:** `text-embedding-3-small` (OpenAI) — chosen for cost and broad availability
+- **Embedding model:** `BAAI/bge-m3` (self-hosted, MIT-licensed) — the 2026 enterprise self-hosted default. See METHODOLOGY §"Model and configuration" for the reasoning behind self-hosted over API-based embedding
 - **Chunking strategy:** Split FAQ corpus on H2 (`##`) headings, then further split chunks above 500 tokens at paragraph boundaries. Targets ~300-500 tokens per chunk
 - **Top-K:** 4. Lower end of common defaults (4-8) to give A a fair shot — over-retrieval is a known waste pattern. Adversarial review verifies this is tuned, not just defaulted
 - **Retrieval threshold:** None in v1 (always return K chunks). Documented limitation
@@ -43,6 +43,8 @@ The vector store itself (`vector_store/` directory) is conceptually owned by Sup
 - `search_flights(origin, destination, date_range)` — Booking Systems
 - Additional Booking Systems tools as needed
 - `audit_log(event_type, details)` — Compliance
+
+All tool implementations use parameterized SQL queries; no string concatenation into database paths. Input validation is a code-quality requirement, addressed during Phase 2 implementation (see `openspec/changes/implement-architecture-a/tasks.md`).
 
 ### Prompts
 
@@ -59,6 +61,7 @@ Avoid few-shot examples in system prompt (inflates tokens) and repeated boilerpl
 
 ## Known limitations
 
-- Embedding API calls excluded from per-task cost. Adds ~$0.00002 per task — negligible but non-zero
+- Embedding compute (BGE-M3 inference on CPU) excluded from per-task cost. Adds ~30-100ms of local CPU time per query — non-zero but not a token cost
 - Vector store rebuilt from scratch on fresh clone
 - No retrieval quality monitoring or drift detection
+- BGE-M3 model weights (~2.3GB) must be downloaded once; subsequent runs use the local cache

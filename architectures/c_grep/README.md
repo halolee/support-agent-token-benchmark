@@ -44,6 +44,8 @@ This is grep done thoughtfully — not raw `grep -i` from a shell, but the moral
 - All Booking Systems tools (identical to A)
 - `audit_log` (identical to A)
 
+All tool implementations use parameterized SQL queries; the grep tool's optional regex parameter is character-bounded (≤64 chars by default) to prevent ReDoS. Input validation is a code-quality requirement, addressed during Phase 2 implementation (see `openspec/changes/implement-architecture-c/tasks.md`).
+
 ### Prompts
 
 System prompt should:

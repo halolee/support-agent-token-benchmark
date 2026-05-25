@@ -29,7 +29,7 @@ Support Content's operational burden is highest with E — they maintain both in
 
 ### Retrieval
 
-- **Vector component:** Same as Architecture A (`text-embedding-3-small`, top-K from vector store)
+- **Vector component:** Same as Architecture A (`BAAI/bge-m3` self-hosted embedding, top-K from vector store)
 - **Keyword component:** BM25 (via `rank_bm25` library) over the same chunked corpus
 - **Combination:** Reciprocal Rank Fusion (RRF) to merge vector and BM25 results
 - **Reranking:** Cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2` or similar lightweight model) over merged candidates
@@ -48,6 +48,8 @@ Support Content's operational burden is highest with E — they maintain both in
 - All Booking Systems tools (identical to A)
 - `audit_log` (identical to A)
 
+All tool implementations use parameterized SQL queries; no string concatenation into database paths. Input validation is a code-quality requirement, addressed during Phase 2 implementation (see `openspec/changes/implement-architecture-e/tasks.md`).
+
 ### Prompts
 
 System prompt similar to A's (~500 tokens). The agent doesn't need to know about the hybrid retrieval internals — it just calls the search tool. The agent-facing API is the same as A; only Support Content's implementation differs.
@@ -61,10 +63,11 @@ System prompt similar to A's (~500 tokens). The agent doesn't need to know about
 
 ## Known limitations
 
-- Embedding API calls (vector component) and reranking inference excluded from per-task cost
+- Embedding compute (BGE-M3 inference) and reranking inference excluded from per-task cost — local CPU time, not token cost
 - BM25 index rebuilt on fresh clone (alongside vector store)
 - Reranking model loaded into memory; cold-start cost not measured
 - Tuning is ongoing in production — v1 measures a single tuning configuration
+- BGE-M3 model weights (~2.3GB) must be downloaded once; subsequent runs use the local cache
 
 ## What this architecture demonstrates
 

@@ -10,27 +10,33 @@ Phased execution plan. Each phase produces a working, independently-shippable ar
 
 **Estimated effort:** 1 day
 
-### Step 0: Explore the LangGraph reference (required first action)
+### Step 0: Extract the LangGraph reference assets (required first action)
 
-Before designing anything, read what's already there.
+Before designing anything, get the corpus and database in place and inventory what's there.
 
-- [ ] Open `https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb`
-- [ ] **Important — corpus and database are NOT downloadable as standalone files.** The tutorial builds them inside notebook cells: the FAQ corpus is embedded as a Python string in a setup cell; `travel.sqlite` is created and populated by SQL in another setup cell.
-- [ ] To extract them: clone the LangGraph repo locally, run the notebook's setup cells, then export the FAQ text to `corpus/swiss_faq.md` and copy the generated `travel.sqlite` to `data/`
-- [ ] Note the actual structure of the tutorial's agent — what tools it defines, what dialog routing it uses
-- [ ] Read `swiss_faq.md` to inventory the actual policy classes present (count them, note vocabulary)
+- [ ] **Corpus and database are hosted as direct downloads.** The LangGraph tutorial's `db.py` fetches both at runtime from a public GCS bucket; we can fetch them the same way without cloning the LangGraph repo or running the notebook:
+  - `curl -L -o corpus/swiss_faq.md https://storage.googleapis.com/benchmarks-artifacts/travel-db/swiss_faq.md`
+  - `curl -L -o data/travel.sqlite https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite` *(exact filename — likely `travel2.sqlite` — should be confirmed from the tutorial's `db.py` setup cell; rename the downloaded file to `travel.sqlite` after download to match the path references throughout these docs)*
+- [ ] Verify integrity: `file data/travel.sqlite` should report "SQLite 3.x database"; `head corpus/swiss_faq.md` should show non-empty Markdown
+- [ ] For tutorial context, browse the canonical notebook at `https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb` — note what tools it defines and what dialog routing it uses. The LangGraph project restructured; the latest docs index is at `https://docs.langchain.com/oss/python/langgraph/overview` (the older `examples/customer-support/` path is deprecated).
+- [ ] Read `swiss_faq.md` to inventory the actual policy classes present (count them, note vocabulary). This affects task design (Phase 2 Step 4) and implementation choices for A, C, and E.
 - [ ] Inspect `travel.sqlite` schema (tables, columns, row counts, sample data)
-- [ ] Document findings in a brief `notebooks/00_corpus_inventory.ipynb` — what we're working with
+- [ ] Document findings in a brief `notebooks/00_corpus_inventory.ipynb` — what we're working with. Record the source URLs verbatim so future reproducers have a fixed starting point.
 
-This step exists because we've been treating the LangGraph tutorial as a placeholder. Reading and extracting it first surfaces design constraints we haven't anticipated and confirms what we're actually measuring against.
+This step exists because we've been treating the LangGraph tutorial as a placeholder. Extracting the actual artifacts surfaces design constraints we haven't anticipated and confirms what we're actually measuring against.
+
+If the GCS URLs ever become unavailable, the canonical source is the LangGraph tutorial notebook's `db.py` setup cell, which encodes both the URL pattern and the underlying SQL fallback.
 
 ### Step 1: Project setup
 
 - [ ] Create Python virtual environment
-- [ ] Initialize `requirements.txt` with: `anthropic`, `chromadb` (or `faiss-cpu`), `rank-bm25`, `python-dotenv`, `tabulate`, `pytest` (for sanity tests)
+- [ ] Initialize `requirements.txt` with: `anthropic`, `chromadb` (or `faiss-cpu`), `sentence-transformers` or `FlagEmbedding` (for BGE-M3), `rank-bm25`, `python-dotenv`, `tabulate`, `pytest` (for sanity tests)
 - [ ] **Do not include `tiktoken`** — it's OpenAI's tokenizer and will produce wrong counts for Anthropic models
-- [ ] Set up `.env.example` with `ANTHROPIC_API_KEY` placeholder
+- [ ] **Do not include `openai`** — the project is scoped to Anthropic for inference and self-hosted BGE-M3 for embeddings; no third-party embedding API
+- [ ] Set up `.env.example` with `ANTHROPIC_API_KEY` placeholder only (no OPENAI_API_KEY needed)
 - [ ] Verify corpus and database loaded correctly
+- [ ] Pre-download BGE-M3 model weights to avoid first-run delay during measurement: `python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"` (or equivalent via FlagEmbedding) — caches the model to disk for offline use
+- [ ] **Pin specific versions in `requirements.txt`** (e.g., `anthropic==X.Y.Z`). After install, run `pip freeze > requirements.lock.txt` and commit. Reproducibility (per METHODOLOGY's expected-variance claims) requires pinned versions, not version ranges. BGE-M3 download integrity relies on HuggingFace TLS — accepted risk for v1, would need hash verification for production (see HANDOVER §"Security and governance scope")
 
 ### Step 2: Token counting infrastructure
 

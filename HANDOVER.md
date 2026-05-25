@@ -1,9 +1,13 @@
 # Handover Document — Customer Support Agent
 
-**Status:** Draft for review
+**Status:** Draft for review — this is a *worked example* of a deployment-readiness conversation, not the v1 experiment's approval gate
 **From:** AI Engineering
 **To:** Platform Operations, Support Content, Booking Systems, Compliance
 **Purpose:** Document the architectures evaluated, the cross-team dependencies of each, and the recommended deployment path with honest trade-offs surfaced.
+
+---
+
+> **What this document is.** A worked example of the cross-team conversation that would surround a real deployment decision. v1 itself is a measurement artifact (see `README.md` §"What this project is not"); the measurement framework in `measurement/` is the load-bearing output. The §8 "Security and governance scope" section enumerates concerns a production deployment would need to address but v1 does not. The §10 sign-off table names stakeholder roles a real deployment conversation would include — **it is NOT an approval gate for the experiment itself**.
 
 ---
 
@@ -190,7 +194,28 @@ The interesting question is whether different architectures suit different task 
 
 ---
 
-## 8. Recommended path forward
+## 8. Security and governance scope
+
+The following concerns would be required for a production deployment of any architecture measured here. They are explicitly out of scope for v1, which is a measurement artifact.
+
+| Concern | In v1? | Required for production? | Notes |
+|---|---|---|---|
+| Data classification (corpus tiers) | No | Yes | Corpus content treated as uniform; real corpora need public/internal/restricted tiers with access enforcement |
+| PII handling at tool boundary | No | Yes | Swiss FAQ contains no PII; production tools would need PII redaction before content reaches the model |
+| Data residency | No (US, via Anthropic) | Yes (jurisdiction-dependent) | Inference calls go to Anthropic data centers; EU/regulated deployers must verify adequacy or use an alternative inference path |
+| Compliance-grade audit payload | No (measurement-grade only) | Yes | v1 logs `task_id`, `response`, `tools_called` for measurement equality; production needs timestamps, identity, model version, retrieval evidence |
+| Prompt injection defenses | No | Yes | No injection detection, no untrusted-input boundary on user queries |
+| Indirect prompt injection (corpus poisoning) | No | Yes | Corpus is assumed trusted; no provenance verification on chunks before retrieval |
+| At-rest encryption | No (plaintext) | Yes | Vector store, BM25 index, SQLite DB all unencrypted on local disk |
+| Retention policy (audit logs, indices, raw runs) | No | Yes | No retention SLA defined |
+| Supply chain — model integrity | Partial | Yes | `requirements.txt` pins versions; BGE-M3 download integrity relies on HuggingFace TLS — accepted risk for v1, hash verification required for production |
+| Threat model | No | Yes | No formal threat model; METHODOLOGY's adversarial review covers measurement bias, not security |
+
+This enumeration is the credibility move. The experiment does not claim to address these; listing them lets a real deployment conversation begin from a complete inventory rather than discovering gaps after the fact.
+
+---
+
+## 9. Recommended path forward
 
 > _To be filled in after measurement results are known. The recommendation depends on the measured trade-offs._
 
@@ -205,7 +230,7 @@ The recommendation is not a final decision. It is an input to the cross-team con
 
 ---
 
-## 9. Sign-offs required
+## 10. Sign-offs required
 
 | Role                          | Reviewer | Status |
 |-------------------------------|----------|--------|
