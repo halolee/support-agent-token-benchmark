@@ -15,6 +15,7 @@ when ANTHROPIC_API_KEY is missing (see conftest.py).
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -262,43 +263,125 @@ class TestRecordRun:
 
 
 # =========================================================================
-# Integration: the methodology gate
+# Methodology gate — cassette pattern (record once, replay forever)
 # =========================================================================
+#
+# See BUDGET.md § "Tier 2" for why this is split into record + replay.
+# In short: live API calls are the only way to verify the measurement
+# infrastructure (the measurement IS the thing being measured), but we
+# don't want to burn API budget on every session. Record once with a key,
+# replay for free thereafter.
 
 
+CASSETTE_PATH = Path(__file__).parent / "fixtures" / "methodology_gate.json"
+
+
+@pytest.mark.live_api
 @pytest.mark.requires_api_key
-class TestMethodologyGate:
-    """Real-API verification of METHODOLOGY's 5% sum gate.
+class TestMethodologyGateRecord:
+    """Records the methodology-gate cassette via real API calls.
 
-    Without this passing, the project's headline claim that "decomposition
-    sums equal API-reported tokens within 5%" is unverified for the chosen
-    agent model. This test makes 5 API calls per run (~$0.01 in tokens).
+    Run with: pytest --run-live-api  (needs ANTHROPIC_API_KEY)
+    Cost: ~$0.01 per record. Re-record only when the model version
+    changes or `decompose_request` logic changes.
     """
 
-    def test_decomposition_within_5_percent_of_api_input_tokens(self):
+    def test_record_methodology_gate_cassette(self):
+        from datetime import datetime, timezone
+
         import anthropic
 
-        from measurement.tokens import AGENT_MODEL, decompose_request
+        from measurement.tokens import (
+            AGENT_MODEL,
+            _extract_tool_result_text,
+            _extract_user_message_text,
+            count_tokens,
+        )
+        from tests.cassette import save_cassette
 
         client = anthropic.Anthropic()
 
-        system = "You are a concise assistant. Reply with just 'OK'."
-        messages = [{"role": "user", "content": "Acknowledge."}]
-        tools = []
+        # Simple scenario covering categories 1 (system) and 3 (user message).
+        # Categories 2 (retrieved_context) and 4 (tool_overhead) are empty
+        # here — they'll be 0 in the decomposition. A multi-turn scenario
+        # could be added later as a second cassette if needed.
+        scenario = {
+            "system": "You are a concise assistant. Reply with just 'OK'.",
+            "messages": [{"role": "user", "content": "Acknowledge."}],
+            "tools": [],
+        }
 
         api_response = client.messages.create(
             model=AGENT_MODEL,
             max_tokens=10,
-            system=system,
-            messages=messages,
+            system=scenario["system"],
+            messages=scenario["messages"],
         )
-        api_input_tokens = api_response.usage.input_tokens
+
+        # Record per-category count_tokens responses for the texts
+        # decompose_request will ask for.
+        texts_to_record: list[str] = []
+        if scenario["system"]:
+            texts_to_record.append(scenario["system"])
+        user_text = _extract_user_message_text(scenario["messages"])
+        if user_text:
+            texts_to_record.append(user_text)
+        retrieved_text = _extract_tool_result_text(scenario["messages"])
+        if retrieved_text:
+            texts_to_record.append(retrieved_text)
+        if scenario["tools"]:
+            tools_text = json.dumps(scenario["tools"], separators=(",", ":"))
+            texts_to_record.append(tools_text)
+
+        counts_by_text: dict[str, int] = {}
+        for text in texts_to_record:
+            if text not in counts_by_text:
+                counts_by_text[text] = count_tokens(text, client=client)
+
+        fixture = {
+            "model": AGENT_MODEL,
+            "anthropic_sdk_version": anthropic.__version__,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "scenario": scenario,
+            "api_create_response": {
+                "input_tokens": api_response.usage.input_tokens,
+                "output_tokens": api_response.usage.output_tokens,
+            },
+            "count_tokens_for_pieces": counts_by_text,
+        }
+        save_cassette(fixture, CASSETTE_PATH)
+
+
+class TestMethodologyGateReplay:
+    """Verifies METHODOLOGY's 5% sum gate using the recorded cassette.
+
+    Runs in every session. Exercises real `decompose_request` logic
+    against a mock client that replays the cassette's count_tokens
+    responses. If the gate fails here, either the decomposition logic
+    is wrong or the cassette is stale (re-record).
+    """
+
+    def test_decomposition_within_5_percent_of_recorded_api_tokens(self):
+        from tests.cassette import load_cassette, make_replay_client
+
+        from measurement.tokens import decompose_request
+
+        fixture = load_cassette(CASSETTE_PATH)
+        if fixture is None:
+            pytest.skip(
+                "Methodology-gate cassette not yet recorded. Run "
+                "`pytest --run-live-api` with ANTHROPIC_API_KEY set "
+                "to record (see BUDGET.md Tier 2)."
+            )
+
+        scenario = fixture["scenario"]
+        client = make_replay_client(fixture)
 
         decomposition = decompose_request(
-            system=system,
-            messages=messages,
-            tools=tools,
-            output_tokens=api_response.usage.output_tokens,
+            system=scenario["system"],
+            messages=scenario["messages"],
+            tools=scenario["tools"],
+            output_tokens=fixture["api_create_response"]["output_tokens"],
             client=client,
         )
 
@@ -306,9 +389,12 @@ class TestMethodologyGate:
             decomposition[k]
             for k in ("system_prompt", "retrieved_context", "user_message", "tool_overhead")
         )
+        api_input_tokens = fixture["api_create_response"]["input_tokens"]
         ratio = abs(input_sum - api_input_tokens) / api_input_tokens
         assert ratio < 0.05, (
-            f"Decomposition input sum {input_sum} differs from API "
-            f"input_tokens {api_input_tokens} by {ratio:.1%} "
-            f"(METHODOLOGY tolerance: 5%)"
+            f"Decomposition input sum {input_sum} differs from recorded "
+            f"API input_tokens {api_input_tokens} by {ratio:.1%} "
+            f"(METHODOLOGY tolerance: 5%). "
+            f"Cassette: {CASSETTE_PATH.name}, "
+            f"recorded {fixture.get('recorded_at')}"
         )
