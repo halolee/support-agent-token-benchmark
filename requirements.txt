@@ -1,0 +1,25 @@
+# Direct dependencies — versions pinned after first install for reproducibility.
+# Full transitive lock is in `requirements.lock.txt` (generated via `pip freeze`).
+#
+# Forbidden: `tiktoken` (OpenAI's tokenizer, wrong counts for Anthropic models)
+# and `openai` (project is Anthropic + self-hosted BGE-M3 only — no
+# third-party embedding service).
+#
+# See BUILD_PLAN.md Step 1 for rationale.
+
+# Inference
+anthropic==0.104.1
+
+# Vector store + embedding
+chromadb==1.5.9
+sentence-transformers==5.5.1
+
+# Keyword retrieval (Architecture E)
+rank-bm25==0.2.2
+
+# Config / utilities
+python-dotenv==1.2.2
+tabulate==0.10.0
+
+# Test framework
+pytest==9.0.3
