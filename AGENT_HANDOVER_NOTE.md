@@ -61,6 +61,25 @@ If during implementation you notice:
 3. **A scope addition that wasn't in v1 plan** — push back. "Cumulative scope creep" already happened once with this project; we shipped a tighter v1 specifically to demonstrate prioritization. Don't add B, D, F, H, I to v1 unless we explicitly discuss it.
 4. **A task phrasing that violates Check 2** — fix it. Tasks that map cleanly to category names (or to keyword-friendly vocabulary for grep) are the most common source of accidentally biased measurements.
 
+## Distinguishing rigor from scope creep
+
+These two look identical from the inside, and that's the trap.
+
+When you find yourself arguing for an addition because "a sharp reader will ask about X" or "the obvious objection is Y, so we have to measure Z" — pause. That argument frames the addition as rigor, but it's often scope creep dressed in rigor's clothes.
+
+The check: can that question be answered by ROADMAP (defer to v2 with a documented trigger condition) instead of requiring measurement now?
+
+If yes, defer it. ROADMAP exists precisely so that "a reviewer might ask" doesn't expand v1 indefinitely. Articulating the deferral *is* the rigor — it shows the question was considered, scoped, and deliberately not measured.
+
+If no — if the question is genuinely load-bearing for v1's headline claims and cannot be addressed by deferral — then it's a real scope addition and worth raising explicitly with the user before doing the work.
+
+Examples of the distinction:
+
+- **Scope creep:** "We should measure caching for C and E too, in case a reader argues caching collapses the gap there." → This can be deferred. ROADMAP already lists it. The adversarial review covers the question.
+- **Real rigor:** "Task POL-002 uses keyword vocabulary that gives grep a free signal. The phrasing needs to change before we measure anything." → This is a measurement bias that would invalidate the comparison. Cannot be deferred.
+
+The first kind expands scope. The second kind protects the scope already set. Easy to confuse; worth being explicit about.
+
 ## What success looks like
 
 For each phase:

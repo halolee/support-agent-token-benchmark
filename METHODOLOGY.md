@@ -66,6 +66,33 @@ Brief summary; full implementation specs in each architecture's README.
 
 Booking-related tools (`get_booking_status`, etc.) are identical across all architectures — they're exposed by Booking Systems regardless of which retrieval architecture is used.
 
+### Audit log specification
+
+Every architecture writes to Compliance's `audit_log` tool. To prevent architectural differences from leaking into Compliance overhead in a way that would bias the comparison, the audit payload is uniform across all architectures.
+
+Required fields per audit_log call:
+
+| Field          | Type    | Description                                          |
+|----------------|---------|------------------------------------------------------|
+| `task_id`      | string  | Identifier of the task being processed               |
+| `response`     | string  | The agent's final response to the customer           |
+| `tools_called` | list    | Names of tools invoked during this task (in order)   |
+
+Forbidden in the audit payload (would introduce architectural variance):
+- Retrieved chunk content (architecture-specific)
+- Search keywords or query embeddings (architecture-specific)
+- Internal reasoning traces (architecture-specific)
+
+This is a deliberate methodology choice. Different architectures *could* log different things in production (Compliance might want chunk-level audit trails for RAG and keyword traces for grep). For the measurement, uniform payload removes the variable.
+
+audit_log calls and their token cost are **excluded** from the per-task token decomposition, same as embedding API calls. Their cost is approximately constant across architectures, so including or excluding them does not change relative comparisons.
+
+### Conceptual vs. structural boundaries
+
+The modularity constraint is conceptual, not structural. In v1's single-Python-process repo, the boundaries are enforced by interface discipline: the agent only sees tool responses, never internal data structures of the team that owns the data.
+
+This is appropriate for a measurement experiment. A production deployment of any of these architectures would require real separation across deployable units (separate services, separate repos, separate teams), with the tool's input/output schema as the inter-team contract. The schemas defined in v1 are designed to be portable to that real separation; the directory structure in v1 is not.
+
 ## What gets counted
 
 For each task run, the following are recorded from the API response:
@@ -97,6 +124,7 @@ The following are deliberately excluded from per-task cost numbers:
 
 - **Vector store infrastructure cost.** Hosting, embedding storage, re-indexing on policy updates.
 - **Embedding API calls for retrieval.** Architecture A and E make embedding calls per query. At current pricing this is sub-cent per task and an order of magnitude below inference cost, but it is not zero. Excluded from v1; flagged in `comparison.md`.
+- **Audit log API calls.** Every architecture writes to Compliance's `audit_log` tool. The audit payload is uniform across architectures (see "Audit log specification" below) so the token cost would be approximately identical across architectures. To avoid conflating retrieval cost with logging cost, audit_log calls are excluded from the per-task token decomposition entirely. Same pattern as embedding API calls.
 - **Curation cost.** Some architectures benefit from upfront curation (B's policy partitioning, E's reranking model selection). Not measured.
 - **Development cost.** Building Architecture E took longer than Architecture A. Not captured.
 - **Operational costs.** Monitoring, evaluation harnesses, on-call burden.

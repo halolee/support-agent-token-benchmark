@@ -22,6 +22,18 @@
 | C — Grep           | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
 | E — Hybrid RAG     | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
 
+### Scope of measurement: the cache matrix
+
+The four measured architectures span three retrieval strategies (A, C, E) with caching enabled on one (A+G). The full architecture × caching matrix has six cells; v1 measures four. The unmeasured cells are deferred to v2 per `ROADMAP.md`, not omitted.
+
+|                  | Cache Off       | Cache On                |
+|------------------|-----------------|-------------------------|
+| A (Naive RAG)    | ✓ measured      | ✓ measured (= A+G)      |
+| C (Grep)         | ✓ measured      | deferred to v2          |
+| E (Hybrid RAG)   | ✓ measured      | deferred to v2          |
+
+Reading the matrix: v1 measures the effect of caching on the canonical pattern (A vs A+G) as a representative datapoint. Whether caching produces a comparable effect on C and E is a v2 question, triggered by whether A+G's caching effect is dramatic enough that the same question becomes important for the other architectures. This is a deliberate scope choice, not an omission.
+
 ## Per-class breakdown
 
 The interesting question is whether the architectures perform differently on different task classes. If one architecture is uniformly best, the choice is straightforward. If they trade wins across classes, the right answer depends on production traffic shape.

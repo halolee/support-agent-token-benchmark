@@ -15,13 +15,14 @@ Phased execution plan. Each phase produces a working, independently-shippable ar
 Before designing anything, read what's already there.
 
 - [ ] Open `https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb`
-- [ ] Note the actual structure of the tutorial's agent — what tools it defines, what corpus it uses, what database schema it uses
-- [ ] Download `swiss_faq.md` and `travel.sqlite` to `corpus/` and `data/` respectively
+- [ ] **Important — corpus and database are NOT downloadable as standalone files.** The tutorial builds them inside notebook cells: the FAQ corpus is embedded as a Python string in a setup cell; `travel.sqlite` is created and populated by SQL in another setup cell.
+- [ ] To extract them: clone the LangGraph repo locally, run the notebook's setup cells, then export the FAQ text to `corpus/swiss_faq.md` and copy the generated `travel.sqlite` to `data/`
+- [ ] Note the actual structure of the tutorial's agent — what tools it defines, what dialog routing it uses
 - [ ] Read `swiss_faq.md` to inventory the actual policy classes present (count them, note vocabulary)
 - [ ] Inspect `travel.sqlite` schema (tables, columns, row counts, sample data)
 - [ ] Document findings in a brief `notebooks/00_corpus_inventory.ipynb` — what we're working with
 
-This step exists because we've been treating the LangGraph tutorial as a placeholder. Reading it first may surface design constraints we haven't anticipated, and may save implementation effort by reusing existing structures.
+This step exists because we've been treating the LangGraph tutorial as a placeholder. Reading and extracting it first surfaces design constraints we haven't anticipated and confirms what we're actually measuring against.
 
 ### Step 1: Project setup
 
