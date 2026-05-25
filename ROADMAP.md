@@ -116,6 +116,10 @@ The shape: v1 measures cost and success on a static dataset. It doesn't measure 
 
 **Good fit for an open-source contributor.** Independent of the other Beyond-v2 items; doesn't require training infrastructure (unlike F) or a new component to build (unlike H). The instrumentation hook is the existing `setup_*` script in each architecture; the rest is task-set construction and a second measurement pass.
 
+### .NET reference implementation
+
+A C#/.NET port of the architectures as a reference implementation. v1 is Python because the AI tooling ecosystem is Python-dominant — even Microsoft pushes Python for Azure AI Foundry and Semantic Kernel's Python flavor. A .NET port serves enterprise .NET-shaped readers who'd prefer to evaluate the architectures against their actual stack. Component mapping: Azure AI Search or Qdrant.NET for vector retrieval, ONNX Runtime for BGE-M3, Semantic Kernel for agent orchestration, inter-service contracts model the modularity constraint cleanly. Methodology is language-invariant; the architectural trade-offs hold whichever language. Good open-source contributor fit for someone .NET-fluent.
+
 ## Decision log
 
 Significant scope decisions and their rationale:
@@ -128,6 +132,7 @@ Significant scope decisions and their rationale:
 | Design phase | Enforced modularity constraint across all architectures | Simulates enterprise org-chart reality. Without it, the experiment measures startup-context architectures, not enterprise ones. |
 | Design phase | Phased build (foundation → core → variant → optional) | Allows shipping a working artifact at each phase. Supports parallel execution with job hunt. |
 | 2026-05-25 | Added "corpus/data evolution axis" to Beyond v2 | Surfaced during Phase 1 Step 0 corpus inventory. The bucket's travel→travel2 evolution suggested an adaptation-cost experimental axis distinct from per-call token cost. Flagged as a good contributor fit for the open-source v2+. |
+| 2026-05-25 | Stay Python for v1; .NET reference implementation noted as Beyond-v2 candidate | Solo-founder runway considerations favor the language ecosystem with mature AI tooling — even Microsoft pushes Python for Azure AI Foundry and Semantic Kernel's Python flavor. The methodology is language-invariant, so .NET-shaped enterprise readers can map architectures to their stack via the component mapping in the Beyond-v2 entry. The article will include a "mapping to .NET ecosystem" paragraph for that audience. |
 
 ## How this document gets updated
 
