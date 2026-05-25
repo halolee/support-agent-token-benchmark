@@ -118,6 +118,15 @@ def decompose_request(
     — this is mandated by METHODOLOGY and is NOT computed via count_tokens
     (output tokens differ from input tokens in framing and re-counting
     would inflate the number).
+
+    METHODOLOGY note on framing overhead:
+        Each count_tokens call adds ~7 tokens of envelope/role framing.
+        For Phase 2 inputs (~500-token system prompts, ~200-token retrieved
+        chunks), this overhead is <2% per category and the 5% sum gate
+        comfortably holds. For tiny inputs (<50 tokens), framing dominates
+        and the gate may fail — but that regime isn't what we measure.
+        See `tests/test_tokens.py::TestMethodologyGateRecord` for the
+        realistic-scenario baseline.
     """
     system_tokens = count_tokens(system, client=client) if system else 0
 

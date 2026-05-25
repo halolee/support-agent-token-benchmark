@@ -301,13 +301,42 @@ class TestMethodologyGateRecord:
 
         client = anthropic.Anthropic()
 
-        # Simple scenario covering categories 1 (system) and 3 (user message).
-        # Categories 2 (retrieved_context) and 4 (tool_overhead) are empty
-        # here — they'll be 0 in the decomposition. A multi-turn scenario
-        # could be added later as a second cassette if needed.
+        # Realistic-sized scenario — the 5% methodology gate applies to
+        # inputs in the regime Phase 2 will operate in (~300-500 token
+        # system prompts). With tiny inputs, count_tokens' per-call
+        # framing overhead (~7 tokens) dominates and the gate trivially
+        # fails. See decompose_request docstring for the assumption.
         scenario = {
-            "system": "You are a concise assistant. Reply with just 'OK'.",
-            "messages": [{"role": "user", "content": "Acknowledge."}],
+            "system": (
+                "You are a customer support agent for Swiss Airlines. Your "
+                "role is to help customers with their bookings, flights, and "
+                "travel policies.\n\n"
+                "Guidelines:\n"
+                "- Be concise but complete. Don't pad responses with "
+                "unnecessary pleasantries.\n"
+                "- When citing policy, always reference the specific section.\n"
+                "- If a customer's question requires looking up data, use the "
+                "tools provided.\n"
+                "- If you don't know something, say so directly rather than "
+                "guessing.\n"
+                "- Confirm booking IDs back to the customer before making "
+                "changes.\n"
+                "- For policy questions outside your knowledge, escalate to a "
+                "human agent.\n\n"
+                "Tone: professional, helpful, calm. The customer is often "
+                "stressed about travel."
+            ),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Hi, I'd like to check the status of my booking "
+                        "ABC123. I'm supposed to fly tomorrow from Zurich to "
+                        "New York and I'm getting nervous because I haven't "
+                        "received any updates."
+                    ),
+                }
+            ],
             "tools": [],
         }
 
