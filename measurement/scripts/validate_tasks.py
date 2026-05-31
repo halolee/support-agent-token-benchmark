@@ -342,8 +342,12 @@ def check_fixtures_resolve(tasks: list[ParsedTask], ctx: Context) -> list[Violat
     if not ctx.fixtures_by_kind:
         return out
     if not ctx.sqlite_path.exists():
+        # ERROR not WARN: a silent skip here would defeat the drift gate's
+        # only job. If fixtures are committed but the db is unreachable in
+        # CI (path misconfig, missing mount), the green-pass is a lie.
         out.append(Violation("fixtures-resolve",
-                             f"sqlite db not found at {ctx.sqlite_path}", severity="WARN"))
+                             f"sqlite db not found at {ctx.sqlite_path} — drift gate cannot run; "
+                             f"either restore data/travel.sqlite or remove task_fixtures.json"))
         return out
 
     kind_to_query = {

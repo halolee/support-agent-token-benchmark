@@ -43,12 +43,14 @@ def _good_task(**overrides) -> dict:
 
 
 def _run(tmp_path: Path, lines, *, strict: bool = False, fixtures: dict | None = None,
-         answers: str | bool | None = True) -> list[Violation]:
+         answers: str | bool | None = True, sqlite_path: Path | None = None) -> list[Violation]:
     """Wrapper around validate() that wires tmp_path-based inputs.
 
     `lines` is a list of dicts (JSON-encoded) or raw strings (passed through).
     `answers=True` auto-generates matching `## TASK-ID` headings so the parity
     check stays quiet unless the test is specifically about parity.
+    `sqlite_path=None` uses the real DEFAULT_SQLITE; pass a nonexistent Path to
+    exercise the missing-db code path.
     """
     tasks_path = tmp_path / "tasks.jsonl"
     encoded = []
@@ -70,7 +72,7 @@ def _run(tmp_path: Path, lines, *, strict: bool = False, fixtures: dict | None =
     return validate(
         jsonl_path=tasks_path,
         fixtures_path=fixtures_path,
-        sqlite_path=DEFAULT_SQLITE,
+        sqlite_path=sqlite_path if sqlite_path is not None else DEFAULT_SQLITE,
         answers_path=answers_path,
         strict=strict,
     )
@@ -336,6 +338,24 @@ def test_fixtures_resolution_skipped_when_file_absent(tmp_path):
     violations = _run(tmp_path, [_good_task()])  # fixtures=None → no file written
     assert not _has(violations, "fixtures-resolve"), \
         "fixtures-resolve must be silent when task_fixtures.json is absent"
+
+
+def test_fixtures_resolution_errors_when_sqlite_missing(tmp_path):
+    """Fixtures committed but sqlite missing → ERROR, not silent skip.
+    A WARN here would let CI report green while the drift gate does nothing."""
+    fixtures = {
+        "book_refs": [{"value": "06B046", "rationale": "real reference"}],
+        "flight_nos": [],
+        "ticket_nos": [],
+    }
+    violations = _run(
+        tmp_path, [_good_task()], fixtures=fixtures,
+        sqlite_path=tmp_path / "absent.sqlite",
+    )
+    drift = [v for v in violations if v.requirement == "fixtures-resolve"]
+    assert drift, "expected fixtures-resolve violation when sqlite is missing"
+    assert all(v.severity == "ERROR" for v in drift), \
+        f"expected ERROR severity (not WARN); got {[(v.severity, v.message) for v in drift]}"
 
 
 def test_committed_fixtures_resolve_against_real_sqlite():
