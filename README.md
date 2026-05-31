@@ -6,16 +6,60 @@ A measurement framework for comparing retrieval architectures used in LLM-based 
 
 Four implementations of the same customer support task, measured head-to-head with the same task set, the same model, and the same cross-team modularity constraints:
 
-- **Architecture A — Naive RAG.** Vector store + top-K retrieval + LLM agent with tool calls. The pattern most tutorials show and most v1 deployments ship.
-- **Architecture A+G — Naive RAG with prompt caching.** Same as A, with Anthropic's prompt caching enabled. The "have you tried the obvious optimization first" baseline.
-- **Architecture C — Keyword search (grep).** A `grep`-style search exposed as a single tool. The "traditional retrieval still works" alternative.
-- **Architecture E — Hybrid RAG.** Vector + BM25 combined with reranking. The production-standard pattern mature teams converge on.
+- **Naive RAG (A).** Vector store + top-K retrieval + LLM agent with tool calls. The pattern most tutorials show and most v1 deployments ship.
+- **Cached RAG (A+G).** Same as Naive RAG, with Anthropic's prompt caching enabled. The "have you tried the obvious optimization first" baseline.
+- **Grep search (C).** A `grep`-style keyword search exposed as a single tool. The "traditional retrieval still works" alternative.
+- **Hybrid RAG (E).** Vector + BM25 combined with reranking. The production-standard pattern mature teams converge on.
 
 Two further architectures are scoped but deferred to v2:
-- **Architecture B — Bounded structured tools** (one tool per policy class)
-- **Architecture D — Full corpus stuffed, no retrieval**
+- **Bounded tools (B)** — one tool per policy class
+- **Stuffed corpus (D)** — full corpus in context, no retrieval
 
-Three more are mentioned in the companion article but not measured: fine-tuning (F), deterministic routing with LLM at the edges (H), and no-LLM-at-all (I).
+Three more are mentioned in the companion article but not measured: fine-tuned (F), deterministic routing with LLM at the edges (H), and no-LLM-at-all (I).
+
+> _Naming note:_ this README uses descriptive names with the article taxonomy letter in parentheses (e.g., "Naive RAG (A)"). Deeper docs (`METHODOLOGY.md`, `ARCHITECTURE_RATIONALE.md`, etc.) still use the letter labels directly while the broader rename is deferred — see issue #4.
+
+## Architecture comparison at a glance
+
+The four measured architectures all start from the same user query and end at the same agent response. What changes is the retrieval path in the middle — and that path is where most of the token cost accumulates.
+
+```mermaid
+flowchart LR
+    Q([User query])
+    R([Agent response])
+
+    Q --> A1
+    Q --> AG1
+    Q --> C1
+    Q --> E1
+
+    subgraph A_lane["Naive RAG (A)"]
+      direction LR
+      A1[Embed query] --> A2[Vector store<br/>top-K] --> A3[Inject chunks<br/>into context]
+    end
+
+    subgraph AG_lane["Cached RAG (A+G)"]
+      direction LR
+      AG1[Embed query] --> AG2[Vector store<br/>top-K] --> AG3[Inject chunks<br/>cached prefix reused]
+    end
+
+    subgraph C_lane["Grep search (C)"]
+      direction LR
+      C1[Extract keywords] --> C2[Grep corpus] --> C3[Inject matches<br/>into context]
+    end
+
+    subgraph E_lane["Hybrid RAG (E)"]
+      direction LR
+      E1[Embed query<br/>+ keywords] --> E2[Vector + BM25<br/>union] --> E3[Cross-encoder<br/>rerank] --> E4[Inject top-K<br/>into context]
+    end
+
+    A3 --> R
+    AG3 --> R
+    C3 --> R
+    E4 --> R
+```
+
+Same destination, four different paths. Token cost per task is dominated by what each lane injects into context — measured per-architecture in `measurement/results/comparison.md`.
 
 ## What this project is not
 
@@ -40,12 +84,12 @@ See `METHODOLOGY.md` §"Modularity constraint" for the full specification and `H
 
 The four measured architectures were chosen against an explicit framework: what is *popular*, what are the *misconceptions*, what is *industry standard*, and what are *our assumptions worth testing*. The full rationale is in `ARCHITECTURE_RATIONALE.md`. Brief summary:
 
-- **A** is the popular default and the source of most misconceptions about "RAG."
-- **A+G** is the obvious optimization production teams should try before any architectural change.
-- **C** tests the assumption that semantic retrieval is necessary for LLM agents.
-- **E** is the production-standard pattern; any alternative has to beat this, not the naive baseline.
+- **Naive RAG (A)** is the popular default and the source of most misconceptions about "RAG."
+- **Cached RAG (A+G)** is the obvious optimization production teams should try before any architectural change.
+- **Grep search (C)** tests the assumption that semantic retrieval is necessary for LLM agents.
+- **Hybrid RAG (E)** is the production-standard pattern; any alternative has to beat this, not the naive baseline.
 
-B and D were considered and deferred. Cutting scope to ship the load-bearing comparison first is itself a deliberate decision; see `ROADMAP.md` for v2 scope.
+Bounded tools (B) and Stuffed corpus (D) were considered and deferred. Cutting scope to ship the load-bearing comparison first is itself a deliberate decision; see `ROADMAP.md` for v2 scope.
 
 ## Quick start
 
@@ -101,10 +145,10 @@ Expected runtime: ~8–10 minutes for the full task set across all four architec
 
 | Architecture       | Mean tokens / task | Cost / task | Success rate | Mean latency |
 |--------------------|--------------------|-------------|--------------|--------------|
-| A — Naive RAG      | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| A+G — A w/ cache   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| C — Grep           | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| E — Hybrid RAG     | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Naive RAG (A)      | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Cached RAG (A+G)   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Grep search (C)    | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Hybrid RAG (E)     | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
 
 Per-task-class breakdowns and the full discussion are in `measurement/results/comparison.md`.
 
@@ -123,7 +167,7 @@ Full details in `METHODOLOGY.md`.
 
 ## Related work
 
-- [LangGraph customer support tutorial](https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb) — Architecture A is closely modeled on this; corpus and database forked from here.
+- [LangGraph customer support tutorial](https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb) — Naive RAG (A) is closely modeled on this; corpus and database forked from here.
 - [Silicon Data, _Understanding LLM Cost Per Token_](https://www.silicondata.com/blog/llm-cost-per-token) — Token decomposition methodology.
 - [SolDevelo, _A real-world test of RAG vs. Direct API calls_](https://soldevelo.com/blog/a-real-world-test-of-rag-vs-direct-api-calls/) — Independent measurement; relevant precedent.
 
