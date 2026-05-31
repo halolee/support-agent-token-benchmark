@@ -381,8 +381,7 @@ def check_expected_answers_parity(tasks: list[ParsedTask], ctx: Context) -> list
     if not ctx.answers_path.exists():
         if task_ids:
             out.append(Violation("expected-answers-parity",
-                                 f"tasks_expected_answers.md missing at {ctx.answers_path}",
-                                 severity="WARN"))
+                                 f"tasks_expected_answers.md missing at {ctx.answers_path}"))
         return out
     headings = set(re.findall(r"^##\s+([A-Z]+-\d{3})", ctx.answers_path.read_text(), re.MULTILINE))
     for tid in sorted(task_ids - headings):
