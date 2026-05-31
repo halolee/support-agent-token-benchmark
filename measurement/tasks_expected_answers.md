@@ -139,18 +139,22 @@ FROM flights WHERE flight_id = 11472;
 
 ## TXN-003
 
-**Task:** Got an email about an upgrade offer for ticket 7240005435767874 — what class am I currently flying?
+**Task:** Got an email about an upgrade offer for ticket 7240005435767874 on booking 0002D8 — what class am I currently flying?
 
-**Expected behaviour:** The agent calls the ticket-lookup tool for `7240005435767874` and reports the fare class. Both segments (LX0136, CX0047) are `Economy`, so the answer is `Economy` (uniform across the ticket's itinerary — no need to enumerate per-segment unless the agent wants to be explicit, which is also fine). The agent should not extrapolate about upgrade eligibility, pricing, or process — the customer asked one question (what class) and the upgrade offer is mentioned only as the reason for asking.
+**Expected behaviour:** The agent calls `get_booking_status('0002D8')`, which returns the booking's itinerary including ticket `7240005435767874` and its segment fares. Both segments (LX0136, CX0047) are `Economy`, so the answer is `Economy` (uniform across the ticket's itinerary — no need to enumerate per-segment unless the agent wants to be explicit, which is also fine). The agent should not extrapolate about upgrade eligibility, pricing, or process — the customer asked one question (what class) and the upgrade offer is mentioned only as the reason for asking.
 
 **SQL (derives the expected answer):**
 
+The shared transactional tool surface is booking-keyed (`get_booking_status(booking_id)`), so the tool's underlying query joins `bookings → tickets → ticket_flights → flights` for the given booking. The agent then filters the returned itinerary to the customer-named ticket.
+
 ```sql
-SELECT f.flight_no, tf.fare_conditions
-FROM ticket_flights tf
+-- The data the tool returns for booking 0002D8 (booking → tickets → fares)
+SELECT t.ticket_no, f.flight_no, tf.fare_conditions
+FROM tickets t
+JOIN ticket_flights tf ON t.ticket_no = tf.ticket_no
 JOIN flights f ON tf.flight_id = f.flight_id
-WHERE tf.ticket_no = '7240005435767874';
--- → LX0136 Economy, CX0047 Economy
+WHERE t.book_ref = '0002D8';
+-- → ticket 7240005435767874: LX0136 Economy, CX0047 Economy
 ```
 
 **Failure modes to penalise:**
@@ -160,3 +164,5 @@ WHERE tf.ticket_no = '7240005435767874';
 - Inventing per-segment fare differences (e.g., "Economy on one segment, Premium Economy on the other") — both segments are Economy in sqlite.
 
 **Note on fixture choice:** Ticket `7240005435767874` is the only one of the three fixture tickets with a uniform fare class across its segments (both Economy). The other two have mixed fares (one segment of the named class, others Economy), which makes them better suited to MIX scenarios where the rubric can score per-segment reasoning. TXN-003 stays pure by using the uniform-fare ticket — the agent's answer is a single class, not a per-segment breakdown.
+
+**Note on PR-review revision (Codex feedback, 2026-05-31):** The original draft asked about ticket `7240005435767874` *without* naming the booking. The shared transactional interface across all measured architectures (per `CLAUDE.md` and `architectures/a_naive_rag/README.md`) is `get_booking_status(booking_id: str)` — there is no `get_ticket` tool. With only a ticket number in the user message, the agent had no documented tool path to reach `fare_conditions`, which would have made TXN-003 unreachable as a control task rather than a fair transactional probe. Revised to include booking `0002D8` in the customer's message (natural phrasing for an upgrade-email scenario — the email would name both) so the agent can call `get_booking_status('0002D8')` and find the ticket inside the returned itinerary. The SQL above reflects the booking-first lookup path the agent's tool actually executes.
