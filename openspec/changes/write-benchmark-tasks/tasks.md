@@ -10,10 +10,10 @@
 
 ## 2. Booking fixtures (one-time sampling)
 
-- [ ] 2.1 Implement `measurement/scripts/sample_fixtures.py` that opens `data/travel.sqlite` and samples: 3 `book_ref` values (varied `total_amount`, varied passenger counts via `tickets` join), 3 `flight_no` values (varied status — at least one cancelled or delayed), 2 `ticket_no` values with non-empty `fare_conditions`. Output: `measurement/task_fixtures.json` with each value annotated with a `rationale` string explaining why it was chosen
-- [ ] 2.2 Run `sample_fixtures.py` once; commit the generated `measurement/task_fixtures.json`; do NOT re-run in CI
-- [ ] 2.3 Extend the validator's referential-integrity check to confirm every fixture entry resolves to a real sqlite row at runtime (catches data drift)
-- [ ] 2.4 Commit: `Phase 2 Step 4.2: booking fixtures sampled and frozen`
+- [x] 2.1 Implement `measurement/scripts/sample_fixtures.py` that opens `data/travel.sqlite` and samples: 3 `book_ref` values (varied `total_amount`, varied passenger counts via `tickets` join), 3 `flight_no` values (varied status — at least one cancelled or delayed), 2 `ticket_no` values with non-empty `fare_conditions`. Output: `measurement/task_fixtures.json` with each value annotated with a `rationale` string explaining why it was chosen
+- [x] 2.2 Run `sample_fixtures.py` once; commit the generated `measurement/task_fixtures.json`; do NOT re-run in CI
+- [x] 2.3 Extend the validator's referential-integrity check to confirm every fixture entry resolves to a real sqlite row at runtime (catches data drift)
+- [x] 2.4 Commit: `Phase 2 Step 4.2: booking fixtures sampled and frozen`
 
 ## 3. Pure policy tasks (POL-001..003)
 

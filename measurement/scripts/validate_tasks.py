@@ -93,6 +93,8 @@ class Context:
     vocab: set[str]
     blacklist: list[str]
     fixtures: set[str]
+    fixtures_by_kind: dict[str, list[str]]
+    fixtures_path: Path
     sqlite_path: Path
     answers_path: Path
     complete_marker: bool
@@ -123,6 +125,29 @@ def load_fixtures(path: Path) -> set[str]:
                 out.add(item)
             elif isinstance(item, dict) and "value" in item:
                 out.add(item["value"])
+    return out
+
+
+def load_fixtures_by_kind(path: Path) -> dict[str, list[str]]:
+    """Returns fixtures grouped by kind (book_refs / flight_nos / ticket_nos).
+
+    Used by check_fixtures_resolve to look up each value in the right table.
+    Returns empty dict if the fixtures file is absent — the resolution check
+    skips silently in that case (validator may be running before §2 lands).
+    """
+    if not path.exists():
+        return {}
+    with path.open() as f:
+        data = json.load(f)
+    out: dict[str, list[str]] = {}
+    for key in ("book_refs", "flight_nos", "ticket_nos"):
+        values: list[str] = []
+        for item in data.get(key, []):
+            if isinstance(item, str):
+                values.append(item)
+            elif isinstance(item, dict) and "value" in item:
+                values.append(item["value"])
+        out[key] = values
     return out
 
 
@@ -307,6 +332,43 @@ def check_citations_match_class(tasks: list[ParsedTask], ctx: Context) -> list[V
     return out
 
 
+def check_fixtures_resolve(tasks: list[ParsedTask], ctx: Context) -> list[Violation]:
+    """Every entry in task_fixtures.json SHALL resolve to a real row in sqlite.
+
+    Catches upstream data drift even when no task yet references the fixture.
+    Skipped silently if the fixtures file is absent (e.g., pre-§2 state).
+    """
+    out: list[Violation] = []
+    if not ctx.fixtures_by_kind:
+        return out
+    if not ctx.sqlite_path.exists():
+        out.append(Violation("fixtures-resolve",
+                             f"sqlite db not found at {ctx.sqlite_path}", severity="WARN"))
+        return out
+
+    kind_to_query = {
+        "book_refs": ("bookings", "book_ref"),
+        "flight_nos": ("flights", "flight_no"),
+        "ticket_nos": ("tickets", "ticket_no"),
+    }
+    con = sqlite3.connect(ctx.sqlite_path)
+    try:
+        for kind, values in ctx.fixtures_by_kind.items():
+            table, column = kind_to_query[kind]
+            for value in values:
+                row = con.execute(
+                    f"SELECT 1 FROM {table} WHERE {column} = ? LIMIT 1", (value,)
+                ).fetchone()
+                if row is None:
+                    out.append(Violation("fixtures-resolve",
+                                         f"fixture {kind[:-1]} {value!r} not found in {table} — "
+                                         f"data drift; re-run measurement/scripts/sample_fixtures.py "
+                                         f"and update {ctx.fixtures_path.name}"))
+    finally:
+        con.close()
+    return out
+
+
 def check_expected_answers_parity(tasks: list[ParsedTask], ctx: Context) -> list[Violation]:
     """Every task_id has a `## TASK-ID` heading in tasks_expected_answers.md.
     Orphaned answer entries (heading without a task) also fail."""
@@ -339,6 +401,7 @@ CHECKS = [
     check_referential_integrity,
     check_booking_data_flag,
     check_citations_match_class,
+    check_fixtures_resolve,
     check_expected_answers_parity,
 ]
 
@@ -364,6 +427,8 @@ def validate(
         vocab=load_vocab(vocab_path),
         blacklist=load_blacklist(blacklist_path),
         fixtures=load_fixtures(fixtures_path),
+        fixtures_by_kind=load_fixtures_by_kind(fixtures_path),
+        fixtures_path=fixtures_path,
         sqlite_path=sqlite_path,
         answers_path=answers_path,
         complete_marker=complete_marker,

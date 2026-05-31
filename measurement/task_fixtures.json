@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "source": "data/travel.sqlite",
+    "sampler": "measurement/scripts/sample_fixtures.py",
+    "frozen": true,
+    "note": "Generated once via sampler. Do not re-run in CI. If the upstream sqlite changes, the validator's fixture-resolution check will catch drift."
+  },
+  "book_refs": [
+    {
+      "value": "3B54BB",
+      "rationale": "high-value multi-passenger booking (total_amount=1204500, 3 tickets) — exercises group/family-booking phrasings"
+    },
+    {
+      "value": "000181",
+      "rationale": "mid-range two-passenger booking (total_amount=131800) — exercises couples/co-travellers phrasings"
+    },
+    {
+      "value": "000012",
+      "rationale": "low-value solo booking (total_amount=37900, 1 ticket) — baseline single-passenger reference"
+    }
+  ],
+  "flight_nos": [
+    {
+      "value": "AA0009",
+      "rationale": "flight with status='Cancelled' — exercises refund/rebooking flows in MIX or EDGE tasks"
+    },
+    {
+      "value": "AA0019",
+      "rationale": "flight with status='Delayed' — exercises status-check TXN and disruption-handling MIX tasks"
+    },
+    {
+      "value": "AA0007",
+      "rationale": "flight with status='Scheduled' — baseline upcoming-flight reference for routine TXN lookups"
+    }
+  ],
+  "ticket_nos": [
+    {
+      "value": "0010005432293166",
+      "rationale": "Business fare ticket — exercises premium fare-class lookups and European fare concept policy questions"
+    },
+    {
+      "value": "0010005432112475",
+      "rationale": "Economy fare ticket — most common fare class, baseline reference for routine fare-conditions TXN tasks"
+    }
+  ]
+}

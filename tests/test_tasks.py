@@ -291,6 +291,71 @@ def test_transactional_with_empty_citations_passes(tmp_path):
     assert not _has(violations, "citations-match-class")
 
 
+# ---------- Requirement: Fixtures resolve to sqlite rows (§2.3) ----------
+
+def test_fixtures_resolution_passes_for_real_values(tmp_path):
+    """Fixtures whose values exist in travel.sqlite produce no violations."""
+    fixtures = {
+        "book_refs": [{"value": "06B046", "rationale": "verified-real reference"}],
+        "flight_nos": [{"value": "QR0051", "rationale": "verified-real reference"}],
+        "ticket_nos": [{"value": "9880005432000987", "rationale": "verified-real reference"}],
+    }
+    violations = _run(tmp_path, [_good_task()], fixtures=fixtures)
+    assert not _has(violations, "fixtures-resolve"), \
+        f"unexpected resolve violations: {[str(v) for v in violations if v.requirement == 'fixtures-resolve']}"
+
+
+def test_fixtures_resolution_fails_for_phantom_book_ref(tmp_path):
+    """A fixture book_ref absent from sqlite triggers a drift violation."""
+    fixtures = {
+        "book_refs": [{"value": "FFFFFF", "rationale": "synthetic phantom for drift test"}],
+        "flight_nos": [],
+        "ticket_nos": [],
+    }
+    violations = _run(tmp_path, [_good_task()], fixtures=fixtures)
+    drift = [v for v in violations if v.requirement == "fixtures-resolve"]
+    assert drift, "expected fixtures-resolve violation for phantom book_ref"
+    assert "FFFFFF" in drift[0].message
+
+
+def test_fixtures_resolution_fails_for_phantom_flight_no(tmp_path):
+    """A fixture flight_no absent from sqlite triggers a drift violation."""
+    fixtures = {
+        "book_refs": [],
+        "flight_nos": [{"value": "ZZ9999", "rationale": "synthetic phantom for drift test"}],
+        "ticket_nos": [],
+    }
+    violations = _run(tmp_path, [_good_task()], fixtures=fixtures)
+    drift = [v for v in violations if v.requirement == "fixtures-resolve"]
+    assert drift, "expected fixtures-resolve violation for phantom flight_no"
+    assert "ZZ9999" in drift[0].message
+
+
+def test_fixtures_resolution_skipped_when_file_absent(tmp_path):
+    """No fixtures file means the resolution check is silent — pre-§2 case."""
+    violations = _run(tmp_path, [_good_task()])  # fixtures=None → no file written
+    assert not _has(violations, "fixtures-resolve"), \
+        "fixtures-resolve must be silent when task_fixtures.json is absent"
+
+
+def test_committed_fixtures_resolve_against_real_sqlite():
+    """The frozen measurement/task_fixtures.json must resolve cleanly against
+    data/travel.sqlite — this is the production drift gate."""
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    answers_path = PROJECT_ROOT / "measurement" / "tasks_expected_answers.md"
+    violations = validate(
+        jsonl_path=PROJECT_ROOT / "measurement" / "tasks.jsonl",
+        fixtures_path=fixtures_path,
+        sqlite_path=DEFAULT_SQLITE,
+        answers_path=answers_path,
+        strict=False,
+    )
+    drift = [v for v in violations if v.requirement == "fixtures-resolve" and v.severity == "ERROR"]
+    assert drift == [], f"committed fixtures drifted from sqlite: {[str(v) for v in drift]}"
+
+
 # ---------- Requirement: Expected answers documented separately ----------
 
 def test_missing_answer_entry_rejected(tmp_path):
