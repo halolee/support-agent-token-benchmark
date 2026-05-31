@@ -43,12 +43,14 @@ def _good_task(**overrides) -> dict:
 
 
 def _run(tmp_path: Path, lines, *, strict: bool = False, fixtures: dict | None = None,
-         answers: str | bool | None = True) -> list[Violation]:
+         answers: str | bool | None = True, sqlite_path: Path | None = None) -> list[Violation]:
     """Wrapper around validate() that wires tmp_path-based inputs.
 
     `lines` is a list of dicts (JSON-encoded) or raw strings (passed through).
     `answers=True` auto-generates matching `## TASK-ID` headings so the parity
     check stays quiet unless the test is specifically about parity.
+    `sqlite_path=None` uses the real DEFAULT_SQLITE; pass a nonexistent Path to
+    exercise the missing-db code path.
     """
     tasks_path = tmp_path / "tasks.jsonl"
     encoded = []
@@ -70,7 +72,7 @@ def _run(tmp_path: Path, lines, *, strict: bool = False, fixtures: dict | None =
     return validate(
         jsonl_path=tasks_path,
         fixtures_path=fixtures_path,
-        sqlite_path=DEFAULT_SQLITE,
+        sqlite_path=sqlite_path if sqlite_path is not None else DEFAULT_SQLITE,
         answers_path=answers_path,
         strict=strict,
     )
@@ -289,6 +291,217 @@ def test_transactional_with_empty_citations_passes(tmp_path):
     t["user_message"] = "What time does my flight QR0051 leave?"
     violations = _run(tmp_path, [t])
     assert not _has(violations, "citations-match-class")
+
+
+# ---------- Requirement: Fixtures resolve to sqlite rows (§2.3) ----------
+
+def test_fixtures_resolution_passes_for_real_values(tmp_path):
+    """Fixtures whose values exist in travel.sqlite produce no violations."""
+    fixtures = {
+        "book_refs": [{"value": "06B046", "rationale": "verified-real reference"}],
+        "flight_nos": [{"value": "QR0051", "rationale": "verified-real reference"}],
+        "ticket_nos": [{"value": "9880005432000987", "rationale": "verified-real reference"}],
+    }
+    violations = _run(tmp_path, [_good_task()], fixtures=fixtures)
+    assert not _has(violations, "fixtures-resolve"), \
+        f"unexpected resolve violations: {[str(v) for v in violations if v.requirement == 'fixtures-resolve']}"
+
+
+def test_fixtures_resolution_fails_for_phantom_book_ref(tmp_path):
+    """A fixture book_ref absent from sqlite triggers a drift violation."""
+    fixtures = {
+        "book_refs": [{"value": "FFFFFF", "rationale": "synthetic phantom for drift test"}],
+        "flight_nos": [],
+        "ticket_nos": [],
+    }
+    violations = _run(tmp_path, [_good_task()], fixtures=fixtures)
+    drift = [v for v in violations if v.requirement == "fixtures-resolve"]
+    assert drift, "expected fixtures-resolve violation for phantom book_ref"
+    assert "FFFFFF" in drift[0].message
+
+
+def test_fixtures_resolution_fails_for_phantom_flight_no(tmp_path):
+    """A fixture flight_no absent from sqlite triggers a drift violation."""
+    fixtures = {
+        "book_refs": [],
+        "flight_nos": [{"value": "ZZ9999", "rationale": "synthetic phantom for drift test"}],
+        "ticket_nos": [],
+    }
+    violations = _run(tmp_path, [_good_task()], fixtures=fixtures)
+    drift = [v for v in violations if v.requirement == "fixtures-resolve"]
+    assert drift, "expected fixtures-resolve violation for phantom flight_no"
+    assert "ZZ9999" in drift[0].message
+
+
+def test_fixtures_resolution_skipped_when_file_absent(tmp_path):
+    """No fixtures file means the resolution check is silent — pre-§2 case."""
+    violations = _run(tmp_path, [_good_task()])  # fixtures=None → no file written
+    assert not _has(violations, "fixtures-resolve"), \
+        "fixtures-resolve must be silent when task_fixtures.json is absent"
+
+
+def test_fixtures_resolution_errors_when_sqlite_missing(tmp_path):
+    """Fixtures committed but sqlite missing → ERROR, not silent skip.
+    A WARN here would let CI report green while the drift gate does nothing."""
+    fixtures = {
+        "book_refs": [{"value": "06B046", "rationale": "real reference"}],
+        "flight_nos": [],
+        "ticket_nos": [],
+    }
+    violations = _run(
+        tmp_path, [_good_task()], fixtures=fixtures,
+        sqlite_path=tmp_path / "absent.sqlite",
+    )
+    drift = [v for v in violations if v.requirement == "fixtures-resolve"]
+    assert drift, "expected fixtures-resolve violation when sqlite is missing"
+    assert all(v.severity == "ERROR" for v in drift), \
+        f"expected ERROR severity (not WARN); got {[(v.severity, v.message) for v in drift]}"
+
+
+def test_committed_fixtures_use_lx_carrier():
+    """All committed flight_no fixtures must start with 'LX' (Swiss carrier).
+    Corpus is swiss_faq.md; non-LX flight_nos make customer-style phrasings
+    semantically incoherent. See design.md Decision 7 amendment."""
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    flight_nos = [item["value"] for item in data.get("flight_nos", [])]
+    non_lx = [f for f in flight_nos if not f.startswith("LX")]
+    assert not non_lx, (
+        f"non-LX flight_nos in fixtures: {non_lx}. Corpus is Swiss Air Lines; "
+        f"re-sample with LIKE 'LX%' constraint."
+    )
+
+
+def test_committed_fixtures_include_comfort_fare():
+    """Committed ticket_no fixtures must include a Comfort fare ticket.
+    Comfort is the EDGE-003 (out-of-scope refusal) grounding — it's in
+    travel.sqlite but absent from swiss_faq.md. See design.md Decision 7
+    amendment."""
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    rationales = " | ".join(item.get("rationale", "") for item in data.get("ticket_nos", []))
+    assert "Comfort" in rationales, (
+        "Comfort fare ticket missing from committed fixtures — EDGE-003 "
+        "out-of-scope grounding requires a fare class present in sqlite but "
+        "absent from corpus. Re-sample with Comfort included."
+    )
+
+
+def test_committed_book_refs_touch_lx_flights():
+    """Every fixture book_ref must have ≥1 LX flight in its itinerary.
+    A 'Swiss customer' booking with no Swiss flights is semantically
+    incoherent against the corpus. See design.md Decision 7 amendment
+    and PR #5 Option F."""
+    import sqlite3
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    book_refs = [item["value"] for item in json.loads(fixtures_path.read_text()).get("book_refs", [])]
+    con = sqlite3.connect(DEFAULT_SQLITE)
+    try:
+        non_lx_bookings = []
+        for ref in book_refs:
+            row = con.execute("""
+                SELECT 1 FROM tickets t JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+                JOIN flights f ON f.flight_id = tf.flight_id
+                WHERE t.book_ref = ? AND f.flight_no LIKE 'LX%' LIMIT 1
+            """, (ref,)).fetchone()
+            if row is None:
+                non_lx_bookings.append(ref)
+    finally:
+        con.close()
+    assert not non_lx_bookings, (
+        f"book_refs with no LX flight in itinerary: {non_lx_bookings}. "
+        f"Re-sample to require LX touch."
+    )
+
+
+def test_committed_tickets_belong_to_fixture_bookings():
+    """Every fixture ticket_no must belong to one of the fixture book_refs.
+    Tight intra-data linkage means customer-style 'on my booking X, ticket Y'
+    phrasings ground true against the data. PR #5 Option F."""
+    import sqlite3
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    book_refs = {item["value"] for item in data.get("book_refs", [])}
+    ticket_nos = [item["value"] for item in data.get("ticket_nos", [])]
+    con = sqlite3.connect(DEFAULT_SQLITE)
+    try:
+        orphaned = []
+        for tno in ticket_nos:
+            row = con.execute("SELECT book_ref FROM tickets WHERE ticket_no = ?", (tno,)).fetchone()
+            if row is None or row[0] not in book_refs:
+                orphaned.append((tno, row[0] if row else None))
+    finally:
+        con.close()
+    assert not orphaned, (
+        f"ticket_nos NOT in any fixture booking: {orphaned}. "
+        f"Each fixture ticket must live inside a fixture booking."
+    )
+
+
+def test_committed_linked_flight_nos_appear_in_fixture_bookings():
+    """Non-Cancelled fixture flight_nos must appear in at least one fixture
+    booking's itinerary. The Cancelled flight is exempt (loose-coupled by
+    design — no booking in this corpus has a cancelled flight; see
+    design.md Decision 7 amendment)."""
+    import sqlite3
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    book_refs = [item["value"] for item in data.get("book_refs", [])]
+    flight_nos = [item["value"] for item in data.get("flight_nos", [])]
+    con = sqlite3.connect(DEFAULT_SQLITE)
+    try:
+        unlinked = []
+        for fno in flight_nos:
+            # A flight_no appears across many flight_id rows (one per scheduled
+            # date). Treat it as Cancelled-exempt if ANY of those rows is Cancelled
+            # — that's the property the sampler used to pick the cancelled fixture.
+            is_cancelled_anywhere = con.execute(
+                "SELECT 1 FROM flights WHERE flight_no = ? AND status = 'Cancelled' LIMIT 1", (fno,)
+            ).fetchone()
+            if is_cancelled_anywhere:
+                continue
+            placeholders = ",".join("?" for _ in book_refs)
+            row = con.execute(f"""
+                SELECT 1 FROM tickets t JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+                JOIN flights f ON f.flight_id = tf.flight_id
+                WHERE t.book_ref IN ({placeholders}) AND f.flight_no = ? LIMIT 1
+            """, [*book_refs, fno]).fetchone()
+            if row is None:
+                unlinked.append(fno)
+    finally:
+        con.close()
+    assert not unlinked, (
+        f"non-Cancelled flight_nos NOT in any fixture booking's itinerary: {unlinked}. "
+        f"Re-sample these flights from inside fixture bookings."
+    )
+
+
+def test_committed_fixtures_resolve_against_real_sqlite():
+    """The frozen measurement/task_fixtures.json must resolve cleanly against
+    data/travel.sqlite — this is the production drift gate."""
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    answers_path = PROJECT_ROOT / "measurement" / "tasks_expected_answers.md"
+    violations = validate(
+        jsonl_path=PROJECT_ROOT / "measurement" / "tasks.jsonl",
+        fixtures_path=fixtures_path,
+        sqlite_path=DEFAULT_SQLITE,
+        answers_path=answers_path,
+        strict=False,
+    )
+    drift = [v for v in violations if v.requirement == "fixtures-resolve" and v.severity == "ERROR"]
+    assert drift == [], f"committed fixtures drifted from sqlite: {[str(v) for v in drift]}"
 
 
 # ---------- Requirement: Expected answers documented separately ----------
