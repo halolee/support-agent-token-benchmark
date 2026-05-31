@@ -4,7 +4,8 @@
     "sampler": "measurement/scripts/sample_fixtures.py",
     "frozen": true,
     "linkage": "hybrid (PR #5 Option F): book_refs touch LX; Scheduled+Arrived flight_nos drawn from fixture bookings' itineraries; Cancelled flight_no is loose-coupled because the corpus has no booked cancellations (design.md Decision 7 amendment); ticket_nos drawn from inside fixture bookings",
-    "note": "Generated once via sampler. Do not re-run in CI. If the upstream sqlite changes, the validator's fixture-resolution check will catch drift."
+    "note": "Generated once via sampler. Do not re-run in CI. If the upstream sqlite changes, the validator's fixture-resolution check will catch drift.",
+    "flight_no_recurrence": "flight_no is NOT unique in data/travel.sqlite — it is a route designator that recurs across dates. Each fixture flight_no has ~61 rows in the flights table (verified for LX0000, LX0082, LX0086 in PR #7 §4 drafting). The 'Cancelled' / 'Scheduled' / 'Arrived' status labels in the flight_no rationale strings below refer to the SPECIFIC instance linked to the fixture booking (e.g., LX0086 → flight_id 11472 → Arrived on booking 3F0481), not to the flight_no globally. Task phrasings that reference a flight_no MUST include a disambiguator (booking, date, or ticket number) — see design.md Decision 7 'Practical implications'."
   },
   "book_refs": [
     {
@@ -41,11 +42,11 @@
     },
     {
       "value": "2350005432655688",
-      "rationale": "Ticket with Business fare in fixture booking 002E3A (couple/co-travellers) — exercises swiss_faq.md European fare concept policy questions on a Business cabin"
+      "rationale": "Multi-segment ticket in fixture booking 002E3A (couple/co-travellers) with 1 Business segment (TK0065, Arrived) + 3 Economy segments (TP0018/Scheduled, LX0082/Scheduled, KE0122/On Time) — the Business leg exercises swiss_faq.md European fare concept policy questions. MIX phrasings MUST read 'the Business segment of ticket 2350005432655688' or 'my Business leg on ticket 2350005432655688' rather than 'my Business ticket 2350005432655688', because only one of four segments is Business."
     },
     {
       "value": "1050005434344662",
-      "rationale": "Ticket with Comfort fare in fixture booking 3F0481 (group/family) — Comfort is present in travel.sqlite but absent from swiss_faq.md, making this ticket the EDGE-003 (out-of-scope refusal) grounding"
+      "rationale": "Multi-segment ticket in fixture booking 3F0481 (group/family) with 1 Comfort segment (SQ0114/Scheduled) + 3 Economy segments (AY0078/Arrived, IB0075/Scheduled, LX0086/Arrived) — the Comfort leg grounds EDGE-003 (out-of-scope refusal) because Comfort is in travel.sqlite but absent from swiss_faq.md. EDGE-003 phrasing MUST reference 'my Comfort leg on ticket 1050005434344662' or 'the Comfort segment of ticket 1050005434344662' rather than 'my Comfort ticket' — only one of four segments is Comfort."
     }
   ]
 }
