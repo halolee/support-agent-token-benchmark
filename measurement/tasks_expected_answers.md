@@ -52,6 +52,8 @@ This document is the human-derived answer key for `measurement/tasks.jsonl`. It 
 - Inventing form names, processing times, or fees not stated in the corpus.
 - Citing the wrong section (e.g., `## Invoice Questions` — relevant but its Q1 is about the re-issuance fee window, not the tax-receipt-sufficiency question; see note below).
 
+**Note on Check 2 grep affinity (intentional, do not "fix"):** This `user_message` contains several terms that appear verbatim or near-verbatim in the target section — "special invoice", "business" (corpus says "business purposes"), "receipt", "booking confirmation". The convergence is real customer language meeting real corpus authorship style, not architect leakage; per [[project-flexibility-over-restriction]] the benchmark preserves natural customer phrasing rather than engineer around it. **Measurement implication:** POL-002 may be a weaker C-vs-A/E discriminator than POL-001/POL-003 — grep is likely to find the right section easily. When interpreting comparison results, treat any C-side win on POL-002 alone as expected; significance should be assessed across the POL class, not on this single task.
+
 **Note on adjacent corpus content (do not exercise here):** `## Invoice Questions` Q1 (line 5) also discusses invoices but focuses on the free re-issuance window — and asserts **100 days**, while `## Ordering an invoice` asserts **90 days** for the same rule. POL-002 is framed around tax-receipt sufficiency, not re-issuance timing, so this inconsistency is deliberately not in scope. The conflict is recorded as a candidate EDGE-002 synthesis-with-conflict framing (see [[project-corpus-inconsistency-handling]] in memory; deferred to a separate design call when EDGE drafting begins).
 
 ---
@@ -60,7 +62,7 @@ This document is the human-derived answer key for `measurement/tasks.jsonl`. It 
 
 **Task:** Quick question before I check out — does paying by credit card cost more than other methods?
 
-**Expected behaviour:** The agent recognises this as a "credit-card surcharge" question and surfaces both relevant facts from `## Frequently asked questions: Payment` Q4: (1) SWISS itself does not add credit-card surcharges; (2) some banks may charge additional fees in individual cases over which SWISS has no influence. Best-form responses surface both — a blanket "no extra fees" is incomplete because it omits the bank-side caveat.
+**Expected behaviour:** The agent recognises this as a credit-card-fees question and surfaces what the corpus actually says: some banks may charge additional fees in individual cases, and SWISS has no influence over those bank-side charges. The corpus does **not** explicitly state whether SWISS itself adds a credit-card-specific surcharge — it only addresses the bank side of the question (framed as "*other* credit card charges"). A corpus-faithful agent surfaces the bank-fee caveat and does not invent a definitive SWISS-side claim (neither "SWISS surcharges credit cards" nor "SWISS does not surcharge credit cards" appears in the source).
 
 **Corpus support** — verbatim from `corpus/swiss_faq.md` `## Frequently asked questions: Payment`:
 
@@ -68,7 +70,11 @@ This document is the human-derived answer key for `measurement/tasks.jsonl`. It 
 > Some banks might charge additional fees in individual cases. SWISS has no influence over these charges.
 
 **Failure modes to penalise:**
-- Claiming a blanket "no, credit card is free" without the bank-side caveat.
+- Asserting "SWISS does not add a credit-card surcharge" as a fact — this is an inference from the section's framing ("*other* charges") but is not stated by the corpus. A corpus-faithful agent acknowledges that the source addresses only bank-side fees and is silent on SWISS-side pricing.
+- Asserting "SWISS does add a credit-card surcharge" as a fact — same reason, counterfactual direction.
+- Omitting the bank-side caveat entirely (the one thing the corpus *does* explicitly say).
 - Inventing specific surcharge percentages (e.g., "2.5%") or named third-party processors.
 - Conflating with currency-conversion fees (Q1–3 in the same section) unless the customer asked about foreign currency — those are a separate topic and asserting them here is over-answering.
 - Citing the wrong section (e.g., `## Credit Cards`, which covers CVV location, not surcharges).
+
+**Note on PR-review revision (Codex feedback, 2026-05-31):** This task's `expected_answer_summary` and rubric originally required the agent to state "SWISS does not add credit-card surcharges" as a positive fact. That phrasing was an inference from the section's framing rather than a corpus quote, and put the rubric in tension with its own `no_fabrication` criterion. Revised to require only the supported bank-side caveat and to score over-assertion in either direction as fabrication. The corrected framing is also a more interesting POL probe: the agent is tested on faithful quoting under partial-coverage corpus, not on agreement with a synthesized expected answer.
