@@ -511,6 +511,18 @@ def test_missing_answer_entry_rejected(tmp_path):
     assert _has(violations, "expected-answers-parity")
 
 
+def test_missing_answers_file_is_error(tmp_path):
+    # If the answers file itself is absent while tasks exist, parity is
+    # impossible to verify — must fail loud (ERROR), not WARN.
+    violations = _run(tmp_path, [_good_task()], answers=False)
+    parity_errors = [v for v in violations
+                     if v.requirement == "expected-answers-parity" and v.severity == "ERROR"]
+    assert parity_errors, (
+        f"expected an ERROR for missing answers file; got "
+        f"{[(v.severity, v.message) for v in violations if v.requirement == 'expected-answers-parity']}"
+    )
+
+
 def test_orphaned_answer_entry_rejected(tmp_path):
     answers_content = "## POL-001\nbody\n\n## MIX-099\norphan body\n"
     violations = _run(tmp_path, [_good_task()], answers=answers_content)
