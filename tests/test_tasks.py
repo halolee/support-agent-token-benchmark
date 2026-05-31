@@ -391,6 +391,101 @@ def test_committed_fixtures_include_comfort_fare():
     )
 
 
+def test_committed_book_refs_touch_lx_flights():
+    """Every fixture book_ref must have ≥1 LX flight in its itinerary.
+    A 'Swiss customer' booking with no Swiss flights is semantically
+    incoherent against the corpus. See design.md Decision 7 amendment
+    and PR #5 Option F."""
+    import sqlite3
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    book_refs = [item["value"] for item in json.loads(fixtures_path.read_text()).get("book_refs", [])]
+    con = sqlite3.connect(DEFAULT_SQLITE)
+    try:
+        non_lx_bookings = []
+        for ref in book_refs:
+            row = con.execute("""
+                SELECT 1 FROM tickets t JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+                JOIN flights f ON f.flight_id = tf.flight_id
+                WHERE t.book_ref = ? AND f.flight_no LIKE 'LX%' LIMIT 1
+            """, (ref,)).fetchone()
+            if row is None:
+                non_lx_bookings.append(ref)
+    finally:
+        con.close()
+    assert not non_lx_bookings, (
+        f"book_refs with no LX flight in itinerary: {non_lx_bookings}. "
+        f"Re-sample to require LX touch."
+    )
+
+
+def test_committed_tickets_belong_to_fixture_bookings():
+    """Every fixture ticket_no must belong to one of the fixture book_refs.
+    Tight intra-data linkage means customer-style 'on my booking X, ticket Y'
+    phrasings ground true against the data. PR #5 Option F."""
+    import sqlite3
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    book_refs = {item["value"] for item in data.get("book_refs", [])}
+    ticket_nos = [item["value"] for item in data.get("ticket_nos", [])]
+    con = sqlite3.connect(DEFAULT_SQLITE)
+    try:
+        orphaned = []
+        for tno in ticket_nos:
+            row = con.execute("SELECT book_ref FROM tickets WHERE ticket_no = ?", (tno,)).fetchone()
+            if row is None or row[0] not in book_refs:
+                orphaned.append((tno, row[0] if row else None))
+    finally:
+        con.close()
+    assert not orphaned, (
+        f"ticket_nos NOT in any fixture booking: {orphaned}. "
+        f"Each fixture ticket must live inside a fixture booking."
+    )
+
+
+def test_committed_linked_flight_nos_appear_in_fixture_bookings():
+    """Non-Cancelled fixture flight_nos must appear in at least one fixture
+    booking's itinerary. The Cancelled flight is exempt (loose-coupled by
+    design — no booking in this corpus has a cancelled flight; see
+    design.md Decision 7 amendment)."""
+    import sqlite3
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    book_refs = [item["value"] for item in data.get("book_refs", [])]
+    flight_nos = [item["value"] for item in data.get("flight_nos", [])]
+    con = sqlite3.connect(DEFAULT_SQLITE)
+    try:
+        unlinked = []
+        for fno in flight_nos:
+            # A flight_no appears across many flight_id rows (one per scheduled
+            # date). Treat it as Cancelled-exempt if ANY of those rows is Cancelled
+            # — that's the property the sampler used to pick the cancelled fixture.
+            is_cancelled_anywhere = con.execute(
+                "SELECT 1 FROM flights WHERE flight_no = ? AND status = 'Cancelled' LIMIT 1", (fno,)
+            ).fetchone()
+            if is_cancelled_anywhere:
+                continue
+            placeholders = ",".join("?" for _ in book_refs)
+            row = con.execute(f"""
+                SELECT 1 FROM tickets t JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+                JOIN flights f ON f.flight_id = tf.flight_id
+                WHERE t.book_ref IN ({placeholders}) AND f.flight_no = ? LIMIT 1
+            """, [*book_refs, fno]).fetchone()
+            if row is None:
+                unlinked.append(fno)
+    finally:
+        con.close()
+    assert not unlinked, (
+        f"non-Cancelled flight_nos NOT in any fixture booking's itinerary: {unlinked}. "
+        f"Re-sample these flights from inside fixture bookings."
+    )
+
+
 def test_committed_fixtures_resolve_against_real_sqlite():
     """The frozen measurement/task_fixtures.json must resolve cleanly against
     data/travel.sqlite — this is the production drift gate."""

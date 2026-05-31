@@ -3,48 +3,49 @@
     "source": "data/travel.sqlite",
     "sampler": "measurement/scripts/sample_fixtures.py",
     "frozen": true,
+    "linkage": "hybrid (PR #5 Option F): book_refs touch LX; Scheduled+Arrived flight_nos drawn from fixture bookings' itineraries; Cancelled flight_no is loose-coupled because the corpus has no booked cancellations (design.md Decision 7 amendment); ticket_nos drawn from inside fixture bookings",
     "note": "Generated once via sampler. Do not re-run in CI. If the upstream sqlite changes, the validator's fixture-resolution check will catch drift."
   },
   "book_refs": [
     {
-      "value": "3B54BB",
-      "rationale": "high-value multi-passenger booking (total_amount=1204500, 3 tickets) — exercises group/family-booking phrasings"
+      "value": "0002D8",
+      "rationale": "solo LX-touching booking, Economy-only (total_amount=23600, 1 ticket) — baseline single-passenger reference and host for the Economy fixture ticket"
     },
     {
-      "value": "000181",
-      "rationale": "mid-range two-passenger booking (total_amount=131800) — exercises couples/co-travellers phrasings"
+      "value": "002E3A",
+      "rationale": "two-passenger LX-touching booking with Business class present (total_amount=393000) — couples/co-travellers premium scenario and host for the Business fixture ticket"
     },
     {
-      "value": "000012",
-      "rationale": "low-value solo booking (total_amount=37900, 1 ticket) — baseline single-passenger reference"
+      "value": "3F0481",
+      "rationale": "three-passenger LX-touching booking spanning Business + Comfort + Economy (total_amount=149100) — group/family scenario and host for the Comfort fixture ticket (Comfort is in sqlite but absent from corpus → EDGE-003 grounding)"
     }
   ],
   "flight_nos": [
     {
       "value": "LX0000",
-      "rationale": "LX flight with status='Cancelled' — disruption reference for MIX 'my flight was cancelled' tasks and EDGE 'cancelled booking' loose-coupling pattern (see design.md Decision 7 amendment — no booking in this corpus actually has a cancelled flight in its itinerary, so cancellation is referenced via flight_no, not book_ref)"
+      "rationale": "LX flight with status='Cancelled' — LOOSE-COUPLED to fixture book_refs (no booking in this corpus has a cancelled flight in its itinerary; this is a structural property of travel.sqlite, see design.md Decision 7 amendment). Used for cancellation-themed MIX tasks via the customer's narrative join."
     },
     {
-      "value": "LX0024",
-      "rationale": "LX flight with status='Delayed' — exercises status-check TXN and disruption-handling MIX tasks"
+      "value": "LX0082",
+      "rationale": "LX flight with status='Scheduled', linked to a fixture booking — customer-style 'my upcoming flight on booking X' phrasings ground naturally because the flight is actually in the booking's itinerary"
     },
     {
-      "value": "LX0002",
-      "rationale": "LX flight with status='Scheduled' — baseline upcoming-flight reference for routine TXN lookups"
+      "value": "LX0086",
+      "rationale": "LX flight with status='Arrived', linked to a fixture booking — supports 'past trip' MIX tasks (e.g. invoice ordering, Decision 7 #8) where the customer references a completed Swiss flight from their booking"
     }
   ],
   "ticket_nos": [
     {
-      "value": "0010005432293166",
-      "rationale": "Business fare ticket — premium fare class covered by swiss_faq.md European fare concept section; supports policy-grounded MIX tasks tying a fare class to FAQ rules"
+      "value": "7240005435767874",
+      "rationale": "Economy ticket inside fixture booking 0002D8 (solo traveller) — baseline routine TXN reference; tight linkage means 'on my booking X, ticket Y' phrasings ground true against the data"
     },
     {
-      "value": "0060005432159785",
-      "rationale": "Comfort fare ticket — present in travel.sqlite but NOT discussed in swiss_faq.md; supports EDGE-003 out-of-scope refusal grounding (agent should decline rather than fabricate from low-similarity retrieval)"
+      "value": "2350005432655688",
+      "rationale": "Ticket with Business fare in fixture booking 002E3A (couple/co-travellers) — exercises swiss_faq.md European fare concept policy questions on a Business cabin"
     },
     {
-      "value": "0010005432112475",
-      "rationale": "Economy fare ticket — most common fare class, baseline reference for routine fare-conditions TXN tasks and Economy Light/Classic/Flex policy questions"
+      "value": "1050005434344662",
+      "rationale": "Ticket with Comfort fare in fixture booking 3F0481 (group/family) — Comfort is present in travel.sqlite but absent from swiss_faq.md, making this ticket the EDGE-003 (out-of-scope refusal) grounding"
     }
   ]
 }

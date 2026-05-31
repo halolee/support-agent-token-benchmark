@@ -8,10 +8,23 @@ file becomes the sanctioned source of booking-data references for the task
 set; the validator emits a warning if a task references a sqlite row that
 isn't in the fixtures.
 
-The queries are deterministic (ORDER BY <stable column> LIMIT 1) so re-running
-on the same sqlite snapshot produces the same output. If the database changes
-upstream, the fixture choices may change too — the validator's referential-
-integrity check is the safety net that surfaces drift.
+Design (hybrid linkage, per PR #5 Option F):
+- All book_refs MUST touch at least one LX (Swiss Air Lines) flight. Corpus
+  is swiss_faq.md; a "Swiss customer" booking with no Swiss flights is
+  semantically incoherent.
+- All ticket_nos MUST belong to one of the fixture book_refs. Tickets
+  sampled independently from bookings produce false intra-data claims like
+  "ticket X on my booking Y" — the agent's get_booking/get_ticket calls
+  would return inconsistent results.
+- flight_nos: 2 of 3 drawn from fixture bookings' LX itineraries (Scheduled
+  + Arrived, for upcoming and past-trip tasks). The 3rd is Cancelled —
+  intentionally loose-coupled because the data is structurally incapable
+  of representing a customer-booked cancelled flight (414 Cancelled rows
+  exist in `flights`, zero tickets are sold against any of them). See
+  design.md Decision 7 amendment for the loose-coupling pattern.
+
+The queries are deterministic (ORDER BY <stable column> ASC LIMIT 1) so
+re-running on the same sqlite snapshot produces the same output.
 
 Usage:
     python measurement/scripts/sample_fixtures.py
@@ -40,144 +53,197 @@ class FixtureRow:
         return {"value": self.value, "rationale": self.rationale}
 
 
+# Reusable subquery: book_refs whose itinerary includes at least one LX flight.
+LX_TOUCHING_SUBQUERY = """
+    SELECT DISTINCT t2.book_ref FROM tickets t2
+    JOIN ticket_flights tf2 ON tf2.ticket_no = t2.ticket_no
+    JOIN flights f2 ON f2.flight_id = tf2.flight_id
+    WHERE f2.flight_no LIKE 'LX%'
+"""
+
+
+def _first_lx_touching_booking(con: sqlite3.Connection, pax: int, classes_filter: str) -> tuple:
+    """Return the alphabetically-first LX-touching book_ref matching constraints.
+
+    `pax` is the exact passenger count required; `classes_filter` is a HAVING
+    fragment over the GROUP_CONCAT of fare classes (e.g., "= 'Economy'" for
+    pure-Economy, "LIKE '%Business%'" for any Business presence).
+    """
+    row = con.execute(f"""
+        SELECT t.book_ref, b.total_amount, COUNT(DISTINCT t.ticket_no) AS pax,
+               GROUP_CONCAT(DISTINCT tf.fare_conditions) AS classes
+        FROM tickets t JOIN bookings b ON b.book_ref = t.book_ref
+        JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+        WHERE t.book_ref IN ({LX_TOUCHING_SUBQUERY})
+        GROUP BY t.book_ref
+        HAVING pax = ? AND classes {classes_filter}
+        ORDER BY t.book_ref ASC LIMIT 1
+    """, (pax,)).fetchone()
+    if row is None:
+        raise RuntimeError(
+            f"no LX-touching booking with pax={pax} and classes {classes_filter}"
+        )
+    return row
+
+
 def sample_book_refs(con: sqlite3.Connection) -> list[FixtureRow]:
-    """Three book_refs spanning total_amount range and passenger count."""
+    """Three LX-touching book_refs spanning passenger count + fare-class variety.
+
+    The 1/2/3-pax constraints are deliberate: they let the three fixture
+    tickets (Economy / Business / Comfort) each live in a different fixture
+    booking, demonstrating distinct customer scenarios.
+    """
     out: list[FixtureRow] = []
 
-    # 1. Highest-value multi-passenger booking — useful for "what did our group pay" MIX tasks.
-    row = con.execute("""
-        SELECT b.book_ref, b.total_amount, COUNT(t.ticket_no) AS passengers
-        FROM bookings b JOIN tickets t ON t.book_ref = b.book_ref
-        GROUP BY b.book_ref
-        HAVING passengers >= 3
-        ORDER BY b.total_amount DESC, b.book_ref ASC
-        LIMIT 1
-    """).fetchone()
+    # Solo traveller, pure Economy — baseline single-passenger TXN reference.
+    row = _first_lx_touching_booking(con, pax=1, classes_filter="= 'Economy'")
     out.append(FixtureRow(
         value=row[0],
-        rationale=f"high-value multi-passenger booking (total_amount={row[1]}, "
-                  f"{row[2]} tickets) — exercises group/family-booking phrasings",
+        rationale=f"solo LX-touching booking, Economy-only "
+                  f"(total_amount={row[1]}, 1 ticket) — baseline single-passenger "
+                  f"reference and host for the Economy fixture ticket",
     ))
 
-    # 2. Mid-value two-passenger booking — useful for couples/co-travellers tasks.
-    row = con.execute("""
-        SELECT b.book_ref, b.total_amount, COUNT(t.ticket_no) AS passengers
-        FROM bookings b JOIN tickets t ON t.book_ref = b.book_ref
-        GROUP BY b.book_ref
-        HAVING passengers = 2
-        ORDER BY b.book_ref ASC
-        LIMIT 1
-    """).fetchone()
+    # Couple/co-travellers with at least one Business ticket — premium spread.
+    row = _first_lx_touching_booking(con, pax=2, classes_filter="LIKE '%Business%'")
     out.append(FixtureRow(
         value=row[0],
-        rationale=f"mid-range two-passenger booking (total_amount={row[1]}) — "
-                  f"exercises couples/co-travellers phrasings",
+        rationale=f"two-passenger LX-touching booking with Business class present "
+                  f"(total_amount={row[1]}) — couples/co-travellers premium scenario "
+                  f"and host for the Business fixture ticket",
     ))
 
-    # 3. Low-value single-passenger booking — useful for solo-traveller TXN tasks.
-    row = con.execute("""
-        SELECT b.book_ref, b.total_amount, COUNT(t.ticket_no) AS passengers
-        FROM bookings b JOIN tickets t ON t.book_ref = b.book_ref
-        GROUP BY b.book_ref
-        HAVING passengers = 1 AND b.total_amount BETWEEN 30000 AND 60000
-        ORDER BY b.book_ref ASC
-        LIMIT 1
-    """).fetchone()
+    # Group/family with all three fare classes — richest scenario coverage.
+    row = _first_lx_touching_booking(
+        con, pax=3,
+        classes_filter="LIKE '%Business%' AND classes LIKE '%Comfort%' AND classes LIKE '%Economy%'",
+    )
     out.append(FixtureRow(
         value=row[0],
-        rationale=f"low-value solo booking (total_amount={row[1]}, 1 ticket) — "
-                  f"baseline single-passenger reference",
+        rationale=f"three-passenger LX-touching booking spanning Business + Comfort + "
+                  f"Economy (total_amount={row[1]}) — group/family scenario and host "
+                  f"for the Comfort fixture ticket (Comfort is in sqlite but absent "
+                  f"from corpus → EDGE-003 grounding)",
     ))
     return out
 
 
-def sample_flight_nos(con: sqlite3.Connection) -> list[FixtureRow]:
-    """Three flight_nos spanning status variety, restricted to LX (Swiss) carrier.
+def sample_flight_nos(con: sqlite3.Connection, book_refs: list[str]) -> list[FixtureRow]:
+    """Three LX flight_nos: cancelled (loose-coupled), scheduled (linked), arrived (linked).
 
-    Carrier restriction matters: corpus is swiss_faq.md (Swiss Air Lines = LX).
-    Picking flight_nos from other carriers (e.g. AA) makes customer-style
-    phrasings semantically incoherent ("I'm a Swiss customer asking about AA…").
+    The Cancelled flight is sampled independently because no booking in this
+    corpus touches a cancelled flight — see design.md Decision 7 amendment.
+    The Scheduled + Arrived flights are drawn from fixture bookings' LX
+    itineraries so customer-style messages can naturally tie the flight to
+    the booking ("on my booking X, the LX flight Y…").
+    """
+    out: list[FixtureRow] = []
+    placeholders = ",".join("?" for _ in book_refs)
+
+    # Cancelled LX — loose-coupled. Sampled across all LX flights regardless of bookings.
+    row = con.execute("""
+        SELECT flight_no FROM flights
+        WHERE status = 'Cancelled' AND flight_no LIKE 'LX%'
+        ORDER BY flight_no ASC LIMIT 1
+    """).fetchone()
+    if row is None:
+        raise RuntimeError("no cancelled LX flight in the corpus")
+    out.append(FixtureRow(
+        value=row[0],
+        rationale="LX flight with status='Cancelled' — LOOSE-COUPLED to fixture "
+                  "book_refs (no booking in this corpus has a cancelled flight in "
+                  "its itinerary; this is a structural property of travel.sqlite, "
+                  "see design.md Decision 7 amendment). Used for cancellation-themed "
+                  "MIX tasks via the customer's narrative join.",
+    ))
+
+    # Scheduled LX from inside one of the fixture bookings — tightly linked.
+    row = con.execute(f"""
+        SELECT DISTINCT f.flight_no FROM tickets t
+        JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+        JOIN flights f ON f.flight_id = tf.flight_id
+        WHERE t.book_ref IN ({placeholders})
+          AND f.flight_no LIKE 'LX%' AND f.status = 'Scheduled'
+        ORDER BY f.flight_no ASC LIMIT 1
+    """, book_refs).fetchone()
+    if row is None:
+        raise RuntimeError("no scheduled LX flight inside any fixture booking")
+    out.append(FixtureRow(
+        value=row[0],
+        rationale=f"LX flight with status='Scheduled', linked to a fixture booking — "
+                  f"customer-style 'my upcoming flight on booking X' phrasings ground "
+                  f"naturally because the flight is actually in the booking's itinerary",
+    ))
+
+    # Arrived LX from inside a fixture booking — past-trip framing.
+    row = con.execute(f"""
+        SELECT DISTINCT f.flight_no FROM tickets t
+        JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+        JOIN flights f ON f.flight_id = tf.flight_id
+        WHERE t.book_ref IN ({placeholders})
+          AND f.flight_no LIKE 'LX%' AND f.status = 'Arrived'
+        ORDER BY f.flight_no ASC LIMIT 1
+    """, book_refs).fetchone()
+    if row is None:
+        raise RuntimeError("no arrived LX flight inside any fixture booking")
+    out.append(FixtureRow(
+        value=row[0],
+        rationale=f"LX flight with status='Arrived', linked to a fixture booking — "
+                  f"supports 'past trip' MIX tasks (e.g. invoice ordering, Decision 7 #8) "
+                  f"where the customer references a completed Swiss flight from their booking",
+    ))
+    return out
+
+
+def sample_ticket_nos(con: sqlite3.Connection, book_refs: list[str]) -> list[FixtureRow]:
+    """Three ticket_nos drawn from inside fixture bookings, covering Business + Comfort + Economy.
+
+    Each ticket lives in a different fixture booking (per sample_book_refs'
+    construction). This is the core of Option F: tight intra-data linkage
+    so customer-style phrasings like "on my booking X, ticket Y" hold true
+    against the data.
     """
     out: list[FixtureRow] = []
 
-    def pick(status: str, note: str) -> None:
-        row = con.execute(
-            "SELECT flight_no FROM flights "
-            "WHERE status = ? AND flight_no LIKE 'LX%' "
-            "AND flight_no NOT IN (SELECT value FROM picked) "
-            "ORDER BY flight_no ASC LIMIT 1",
-            (status,),
-        ).fetchone()
+    def pick(book_ref: str, fare_class: str, rationale: str) -> None:
+        # Prefer tickets where the named fare class is the only class on the ticket,
+        # so the framing is unambiguous; fall back to mixed-class tickets if needed.
+        row = con.execute("""
+            SELECT t.ticket_no FROM tickets t
+            JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+            WHERE t.book_ref = ?
+            GROUP BY t.ticket_no
+            HAVING GROUP_CONCAT(DISTINCT tf.fare_conditions) = ?
+            ORDER BY t.ticket_no ASC LIMIT 1
+        """, (book_ref, fare_class)).fetchone()
         if row is None:
-            raise RuntimeError(f"no LX flight with status={status!r} available")
-        out.append(FixtureRow(value=row[0], rationale=f"LX flight with status={status!r} — {note}"))
-        con.execute("INSERT INTO picked(value) VALUES (?)", (row[0],))
+            # Fall back: any ticket in the booking that has this fare class on at least one leg.
+            row = con.execute("""
+                SELECT t.ticket_no FROM tickets t
+                JOIN ticket_flights tf ON tf.ticket_no = t.ticket_no
+                WHERE t.book_ref = ? AND tf.fare_conditions = ?
+                ORDER BY t.ticket_no ASC LIMIT 1
+            """, (book_ref, fare_class)).fetchone()
+        if row is None:
+            raise RuntimeError(f"no {fare_class} ticket in booking {book_ref}")
+        out.append(FixtureRow(value=row[0], rationale=rationale))
 
-    con.execute("CREATE TEMP TABLE picked(value TEXT PRIMARY KEY)")
-    try:
-        pick("Cancelled", "disruption reference for MIX 'my flight was cancelled' tasks "
-                         "and EDGE 'cancelled booking' loose-coupling pattern (see design.md "
-                         "Decision 7 amendment — no booking in this corpus actually has a "
-                         "cancelled flight in its itinerary, so cancellation is referenced "
-                         "via flight_no, not book_ref)")
-        pick("Delayed", "exercises status-check TXN and disruption-handling MIX tasks")
-        pick("Scheduled", "baseline upcoming-flight reference for routine TXN lookups")
-    finally:
-        con.execute("DROP TABLE picked")
-    return out
+    # Booking[0] is the solo Economy-only — Economy fixture lives here.
+    pick(book_refs[0], "Economy",
+         f"Economy ticket inside fixture booking {book_refs[0]} (solo traveller) — "
+         f"baseline routine TXN reference; tight linkage means 'on my booking X, ticket Y' "
+         f"phrasings ground true against the data")
 
+    # Booking[1] is the 2-pax with Business — Business fixture lives here.
+    pick(book_refs[1], "Business",
+         f"Ticket with Business fare in fixture booking {book_refs[1]} (couple/co-travellers) — "
+         f"exercises swiss_faq.md European fare concept policy questions on a Business cabin")
 
-def sample_ticket_nos(con: sqlite3.Connection) -> list[FixtureRow]:
-    """Three ticket_nos covering Business, Comfort, Economy fare classes.
-
-    Expanded from 2 → 3 during PR #5 review (see OpenSpec tasks.md §2.1).
-    Comfort is included because it is a real fare class in travel.sqlite
-    (17k+ tickets) but is NOT covered in swiss_faq.md — this asymmetry makes
-    it the ideal grounding for EDGE-003 (out-of-scope refusal): a customer
-    asking Comfort-specific policy questions should be answered "I don't
-    have that information," not fabricated from low-similarity retrieval.
-    """
-    out: list[FixtureRow] = []
-
-    # Business — premium fare class, exercises European-fare-concept questions
-    row = con.execute("""
-        SELECT ticket_no, fare_conditions FROM ticket_flights
-        WHERE fare_conditions = 'Business'
-        ORDER BY ticket_no ASC LIMIT 1
-    """).fetchone()
-    out.append(FixtureRow(
-        value=row[0],
-        rationale="Business fare ticket — premium fare class covered by "
-                  "swiss_faq.md European fare concept section; supports "
-                  "policy-grounded MIX tasks tying a fare class to FAQ rules",
-    ))
-
-    # Comfort — present in sqlite but NOT in corpus → EDGE-003 grounding
-    row = con.execute("""
-        SELECT ticket_no, fare_conditions FROM ticket_flights
-        WHERE fare_conditions = 'Comfort'
-        ORDER BY ticket_no ASC LIMIT 1
-    """).fetchone()
-    out.append(FixtureRow(
-        value=row[0],
-        rationale="Comfort fare ticket — present in travel.sqlite but NOT "
-                  "discussed in swiss_faq.md; supports EDGE-003 out-of-scope "
-                  "refusal grounding (agent should decline rather than "
-                  "fabricate from low-similarity retrieval)",
-    ))
-
-    # Economy — most common fare class, baseline TXN
-    row = con.execute("""
-        SELECT ticket_no, fare_conditions FROM ticket_flights
-        WHERE fare_conditions = 'Economy'
-        ORDER BY ticket_no ASC LIMIT 1
-    """).fetchone()
-    out.append(FixtureRow(
-        value=row[0],
-        rationale="Economy fare ticket — most common fare class, baseline "
-                  "reference for routine fare-conditions TXN tasks and "
-                  "Economy Light/Classic/Flex policy questions",
-    ))
+    # Booking[2] is the 3-pax with Comfort — Comfort fixture lives here.
+    pick(book_refs[2], "Comfort",
+         f"Ticket with Comfort fare in fixture booking {book_refs[2]} (group/family) — "
+         f"Comfort is present in travel.sqlite but absent from swiss_faq.md, making this "
+         f"ticket the EDGE-003 (out-of-scope refusal) grounding")
     return out
 
 
@@ -186,18 +252,25 @@ def build_fixtures(sqlite_path: Path) -> dict:
         raise FileNotFoundError(f"sqlite database not found at {sqlite_path}")
     con = sqlite3.connect(sqlite_path)
     try:
+        book_rows = sample_book_refs(con)
+        book_refs = [r.value for r in book_rows]
         return {
             "_meta": {
                 "source": str(sqlite_path.relative_to(PROJECT_ROOT)),
                 "sampler": "measurement/scripts/sample_fixtures.py",
                 "frozen": True,
+                "linkage": "hybrid (PR #5 Option F): book_refs touch LX; "
+                           "Scheduled+Arrived flight_nos drawn from fixture bookings' "
+                           "itineraries; Cancelled flight_no is loose-coupled because the "
+                           "corpus has no booked cancellations (design.md Decision 7 amendment); "
+                           "ticket_nos drawn from inside fixture bookings",
                 "note": "Generated once via sampler. Do not re-run in CI. "
                         "If the upstream sqlite changes, the validator's "
                         "fixture-resolution check will catch drift.",
             },
-            "book_refs": [r.to_dict() for r in sample_book_refs(con)],
-            "flight_nos": [r.to_dict() for r in sample_flight_nos(con)],
-            "ticket_nos": [r.to_dict() for r in sample_ticket_nos(con)],
+            "book_refs": [r.to_dict() for r in book_rows],
+            "flight_nos": [r.to_dict() for r in sample_flight_nos(con, book_refs)],
+            "ticket_nos": [r.to_dict() for r in sample_ticket_nos(con, book_refs)],
         }
     finally:
         con.close()

@@ -78,14 +78,23 @@ Given the corpus is payments/billing-heavy, the candidate task topics shift from
 
 Final tasks may shift during drafting — these are candidates, not committed IDs. Final list lands during the apply phase with user review per class.
 
-**Amendment (PR #5, §2 fixture sampling):** `data/travel.sqlite` has 414 `Cancelled` rows in `flights` but **zero tickets are sold against any cancelled flight** in `ticket_flights`. The dataset models pre-emptive cancellations of unbooked routes, not customer-facing disruption. This means the literal interpretation of "invoice request for a cancelled booking" and "refund question for a cancelled booking" — a `book_ref` whose itinerary contains a cancellation — is unrealizable in this corpus.
+**Amendment (PR #5, §2 fixture sampling) — hybrid linkage (Option F):** Two structural properties of `data/travel.sqlite` shaped the fixture design:
 
-The MIX candidates that imply cancellation are reframed as **loose-coupling tasks**: the customer's narrative references a cancelled `flight_no` (which the agent observes via `get_flight_status` → "Cancelled") alongside an unrelated `book_ref` (which the agent observes via `get_booking_status`). The two facts are joined in the customer's claim, not in the schema. This mirrors real customer-support transcripts, where customers routinely describe disruption in terms not perfectly reflected in the booking database.
+1. **No booked cancellations.** `flights` has 414 rows with `status='Cancelled'`, but **zero tickets are sold against any of them** in `ticket_flights`. The dataset models pre-emptive cancellations of unbooked routes, not customer-facing disruption. The literal "invoice request for a cancelled booking" — a `book_ref` whose itinerary contains a cancellation — is unrealizable.
+2. **Independent sampling produces incoherent fixtures.** An earlier draft of `sample_fixtures.py` sampled book_refs, flight_nos, and ticket_nos independently. The result: fixture tickets lived in non-fixture bookings, and fixture book_refs touched no LX flights at all. Customer-style phrasings like "ticket Y on my booking X" became false against the data.
+
+**Hybrid linkage pattern:**
+- **book_refs:** all touch at least one LX (Swiss) flight in their itinerary. Picked at varied passenger counts (1/2/3) so each fixture booking can host a different fare-class ticket.
+- **Scheduled and Arrived `flight_no` fixtures:** drawn from inside the fixture bookings' LX itineraries. Customer phrasings like "my upcoming LX flight from booking X" ground true.
+- **Cancelled `flight_no` fixture:** loose-coupled by necessity. Sampled across all LX flights regardless of bookings. Cancellation-themed tasks reference it via the customer's narrative ("my LX0000 flight got cancelled, and on my booking X I'd like to…") — the agent verifies via `get_flight_status` and `get_booking_status` independently.
+- **ticket_nos:** each drawn from inside one of the fixture bookings, covering Business + Comfort + Economy across the three fixture bookings. "On my booking X, ticket Y" phrasings ground true.
+
+**Why hybrid, not universal loose-coupling:** loose-coupling everywhere is simpler, but it pushes a realism tax onto every customer phrasing ("my flight" and "my booking" mentioned in separate breaths instead of as connected facts) and removes "verify customer's claim against linked data" as a testable agent competency — exactly the skepticism that EDGE-001 measures and that an agent fabricating linkage would fail. The data supports tight linkage for Scheduled / Arrived / ticket↔booking relationships, so the benchmark uses tight linkage there; only the structurally-unrealizable cancellation case stays loose.
 
 Practical implications for §§3–6 drafting:
-- The cancelled `flight_no` fixture (`LX0000`) is the cancellation reference; *any* `book_ref` fixture can pair with it.
-- Tasks should be phrased as "my flight LX0000 got cancelled and I have booking 3B54BB" rather than "my booking 3B54BB has a cancelled flight" — the former is verifiable via two tool calls; the latter implies a join the data doesn't support.
-- The rubric for these tasks should reward the agent for calling both `get_flight_status` and `get_booking_status`, and for not assuming the cancellation is reflected in the booking itinerary.
+- **Linked fixtures (Scheduled + Arrived flights, all tickets):** phrase tasks naturally — "on my booking X, my flight Y…" / "my ticket Z in Business class…" The data supports the join.
+- **Loose-coupled fixture (Cancelled flight):** phrase tasks as "my flight LX0000 got cancelled; I also have booking X" — two separate facts, joined only in the customer's narrative. The rubric should reward the agent for calling both `get_flight_status` and `get_booking_status`, and for not assuming the cancellation appears in the booking's itinerary.
+- **EDGE-003 (Comfort ticket):** customer phrasing references the Comfort ticket inside its fixture booking. The agent's challenge is recognizing the corpus has no Comfort-specific policy and declining rather than fabricating.
 
 ### Decision 8: EDGE class reframed as three failure-mode probes (amends Decision 7 EDGE candidates)
 
