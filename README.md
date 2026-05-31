@@ -129,7 +129,7 @@ Full details in `METHODOLOGY.md`.
 
 ## Author
 
-Hao Lee — building [OrbitBrain](https://orbitbrain.ai). Repo built as companion to a published analysis of LLM cost architecture; article link will appear in `HANDOVER.md` when ready.
+Hao Li — building [OrbitBrain](https://orbitbrain.ai). Repo built as companion to a published analysis of LLM cost architecture; article link will appear in `HANDOVER.md` when ready.
 
 ## License
 
