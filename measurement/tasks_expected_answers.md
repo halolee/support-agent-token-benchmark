@@ -78,3 +78,85 @@ This document is the human-derived answer key for `measurement/tasks.jsonl`. It 
 - Citing the wrong section (e.g., `## Credit Cards`, which covers CVV location, not surcharges).
 
 **Note on PR-review revision (Codex feedback, 2026-05-31):** This task's `expected_answer_summary` and rubric originally required the agent to state "SWISS does not add credit-card surcharges" as a positive fact. That phrasing was an inference from the section's framing rather than a corpus quote, and put the rubric in tension with its own `no_fabrication` criterion. Revised to require only the supported bank-side caveat and to score over-assertion in either direction as fabrication. The corrected framing is also a more interesting POL probe: the agent is tested on faithful quoting under partial-coverage corpus, not on agreement with a synthesized expected answer.
+
+---
+
+## TXN-001
+
+**Task:** Doing my expense report and I can't find the receipt for booking 002E3A. Can you tell me what I paid in total?
+
+**Expected behaviour:** The agent calls the booking-lookup tool for `002E3A` and reports the row's `total_amount`. No corpus citation is needed — this is a pure transactional lookup. Best-form responses either report the raw number (`393000`) or contextualize it with a reasonable currency interpretation (e.g., `CHF 3,930.00` or `CHF 393,000`); the schema does not annotate currency, so interpretation is downstream of the lookup and any of these forms passes factual correctness.
+
+**SQL (derives the expected answer):**
+
+```sql
+SELECT total_amount FROM bookings WHERE book_ref = '002E3A';
+-- → 393000
+```
+
+**Failure modes to penalise:**
+- Reporting a different number (e.g., the per-passenger total, a sum of `ticket_flights.amount`, or an invented figure). The customer asked for what's on the booking row.
+- Citing `corpus/swiss_faq.md` — no policy is invoked; a citation here is fabrication.
+- Inventing fields not in `bookings` (payment method, refund status, passenger names) — those would require extra tool calls the customer did not ask for.
+
+**Note on currency-unit ambiguity:** The `bookings.total_amount` column in `data/travel.sqlite` is an integer with no documented unit. Real SWISS pricing for two Business-cabin tickets would more plausibly be ~3,930 CHF than 393,000 CHF (the latter would imply ~$440K USD for a round-trip), suggesting the column stores minor units (cents). But the schema is silent and the corpus does not annotate this either, so the rubric accepts both interpretations rather than locking in an inference. This is deliberate per [[project-flexibility-over-restriction]]: the TXN probe measures whether the agent reads the sqlite row correctly, not whether it guesses the right currency convention.
+
+---
+
+## TXN-002
+
+**Task:** Quick check — did my LX0086 leg on booking 3F0481 land OK? Trying to figure out if my next connection is going to work.
+
+**Expected behaviour:** The agent resolves booking `3F0481`'s itinerary (the agent's `get_booking_status` tool returns all segments), identifies the LX0086 segment as `flight_id=11472` (the unique LX0086 instance on this booking — `flight_no` alone is ambiguous across 61 rows in `flights`), and reports `status='Arrived'`. Surfacing `actual_departure` / `actual_arrival` to address the connection-timing concern is a plus. The agent must not pick a different LX0086 instance (e.g., a Cancelled or future-Scheduled one from a different date) — only the one on this customer's booking is relevant.
+
+**SQL (derives the expected answer):**
+
+```sql
+-- Step 1: resolve the unique LX0086 instance on booking 3F0481
+SELECT tf.flight_id
+FROM ticket_flights tf
+JOIN tickets t ON tf.ticket_no = t.ticket_no
+JOIN flights f ON tf.flight_id = f.flight_id
+WHERE t.book_ref = '3F0481' AND f.flight_no = 'LX0086';
+-- → flight_id 11472
+
+-- Step 2: look up status for that flight_id
+SELECT status, scheduled_departure, scheduled_arrival, actual_departure, actual_arrival
+FROM flights WHERE flight_id = 11472;
+-- → status='Arrived'; actual_departure and actual_arrival populated
+```
+
+**Failure modes to penalise:**
+- Reporting a different status (e.g., `Cancelled` or `Scheduled`) for the LX0086 instance on this booking.
+- Looking up `flight_no='LX0086'` without disambiguating via the booking, then reporting the status of an arbitrary row (the data has 61 LX0086 rows across 2024 dates with varying statuses — this would surface a status not relevant to the customer).
+- Citing `corpus/swiss_faq.md` — flight status is sourced from booking + flight data, not policy text.
+- Inventing gate numbers, baggage carousel info, or weather context not present in the `flights` row.
+- Asserting whether the next connection is or isn't viable without actually inspecting the rest of the itinerary (the customer raised the concern but didn't supply the connection details; the agent should either inspect or decline rather than guess).
+
+**Note on flight_no ambiguity (structural property of `data/travel.sqlite`):** `flight_no` is a route designator, not a unique flight identifier — each LX route recurs on many dates, so `flights` has 61 rows for LX0086 across the dataset's 2024 window. The fixture rationale's "Scheduled"/"Arrived" labels refer to the *specific instance linked to a fixture booking* (LX0086→11472→Arrived on 3F0481), not to LX0086 in general. TXN-002 is phrased to force disambiguation via the booking join; an agent that ignores the booking context and queries `flight_no` alone will get a non-unique result and may pick the wrong row. This is realistic — the customer says "my LX0086 leg" because in their mental model there's one specific instance, and the agent has to map that to the right `flight_id`.
+
+---
+
+## TXN-003
+
+**Task:** Got an email about an upgrade offer for ticket 7240005435767874 — what class am I currently flying?
+
+**Expected behaviour:** The agent calls the ticket-lookup tool for `7240005435767874` and reports the fare class. Both segments (LX0136, CX0047) are `Economy`, so the answer is `Economy` (uniform across the ticket's itinerary — no need to enumerate per-segment unless the agent wants to be explicit, which is also fine). The agent should not extrapolate about upgrade eligibility, pricing, or process — the customer asked one question (what class) and the upgrade offer is mentioned only as the reason for asking.
+
+**SQL (derives the expected answer):**
+
+```sql
+SELECT f.flight_no, tf.fare_conditions
+FROM ticket_flights tf
+JOIN flights f ON tf.flight_id = f.flight_id
+WHERE tf.ticket_no = '7240005435767874';
+-- → LX0136 Economy, CX0047 Economy
+```
+
+**Failure modes to penalise:**
+- Reporting a different fare class.
+- Citing a `corpus/swiss_faq.md` section about Economy fare conditions or upgrade policy — the customer asked what class they're in (transactional), not what the class entails or how to upgrade (which would be MIX). Citing here is over-answering.
+- Asserting upgrade eligibility, upgrade pricing, or upgrade availability. These require tool calls the agent does not have in scope; making confident claims is fabrication.
+- Inventing per-segment fare differences (e.g., "Economy on one segment, Premium Economy on the other") — both segments are Economy in sqlite.
+
+**Note on fixture choice:** Ticket `7240005435767874` is the only one of the three fixture tickets with a uniform fare class across its segments (both Economy). The other two have mixed fares (one segment of the named class, others Economy), which makes them better suited to MIX scenarios where the rubric can score per-segment reasoning. TXN-003 stays pure by using the uniform-fare ticket — the agent's answer is a single class, not a per-segment breakdown.
