@@ -253,6 +253,21 @@ def test_policy_with_booking_reference_rejected(tmp_path):
     assert _has(violations, "booking-data-flag")
 
 
+def test_mixed_with_ref_but_flag_false_rejected(tmp_path):
+    """A MIX task that mentions a real booking but sets booking_data_required=false
+    must be flagged — the data path the prompt needs would not be provisioned."""
+    t = _good_task(
+        task_id="MIX-001",
+        user_message="On booking 06B046, when does the invoice typically arrive?",
+        booking_data_required=False,
+    )
+    t["class"] = "mixed"
+    violations = _run(tmp_path, [t])
+    flag_errs = [v for v in violations
+                 if v.requirement == "booking-data-flag" and "booking_data_required=false" in v.message]
+    assert flag_errs, f"expected booking-data-flag violation for the false-flag case; got {[str(v) for v in violations]}"
+
+
 # ---------- Requirement: Expected citations match class ----------
 
 def test_policy_with_empty_citations_rejected(tmp_path):

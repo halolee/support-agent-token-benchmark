@@ -284,6 +284,10 @@ def check_booking_data_flag(tasks: list[ParsedTask], ctx: Context) -> list[Viola
             or FLIGHT_NO_RE.search(t.model.user_message)
             or TICKET_NO_RE.search(t.model.user_message)
         )
+        if has_ref and not t.model.booking_data_required:
+            out.append(Violation("booking-data-flag",
+                                 "user_message references a booking/flight/ticket but booking_data_required=false — agent will not be given the data path the prompt needs",
+                                 line=t.line, task_id=t.model.task_id))
         if t.model.class_ == "policy" and has_ref:
             out.append(Violation("booking-data-flag",
                                  "policy task references a booking — reclassify as mixed",
