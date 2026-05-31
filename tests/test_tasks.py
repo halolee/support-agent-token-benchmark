@@ -358,6 +358,39 @@ def test_fixtures_resolution_errors_when_sqlite_missing(tmp_path):
         f"expected ERROR severity (not WARN); got {[(v.severity, v.message) for v in drift]}"
 
 
+def test_committed_fixtures_use_lx_carrier():
+    """All committed flight_no fixtures must start with 'LX' (Swiss carrier).
+    Corpus is swiss_faq.md; non-LX flight_nos make customer-style phrasings
+    semantically incoherent. See design.md Decision 7 amendment."""
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    flight_nos = [item["value"] for item in data.get("flight_nos", [])]
+    non_lx = [f for f in flight_nos if not f.startswith("LX")]
+    assert not non_lx, (
+        f"non-LX flight_nos in fixtures: {non_lx}. Corpus is Swiss Air Lines; "
+        f"re-sample with LIKE 'LX%' constraint."
+    )
+
+
+def test_committed_fixtures_include_comfort_fare():
+    """Committed ticket_no fixtures must include a Comfort fare ticket.
+    Comfort is the EDGE-003 (out-of-scope refusal) grounding — it's in
+    travel.sqlite but absent from swiss_faq.md. See design.md Decision 7
+    amendment."""
+    fixtures_path = PROJECT_ROOT / "measurement" / "task_fixtures.json"
+    if not fixtures_path.exists():
+        pytest.skip("measurement/task_fixtures.json not yet generated")
+    data = json.loads(fixtures_path.read_text())
+    rationales = " | ".join(item.get("rationale", "") for item in data.get("ticket_nos", []))
+    assert "Comfort" in rationales, (
+        "Comfort fare ticket missing from committed fixtures — EDGE-003 "
+        "out-of-scope grounding requires a fare class present in sqlite but "
+        "absent from corpus. Re-sample with Comfort included."
+    )
+
+
 def test_committed_fixtures_resolve_against_real_sqlite():
     """The frozen measurement/task_fixtures.json must resolve cleanly against
     data/travel.sqlite — this is the production drift gate."""

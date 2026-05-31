@@ -78,6 +78,15 @@ Given the corpus is payments/billing-heavy, the candidate task topics shift from
 
 Final tasks may shift during drafting — these are candidates, not committed IDs. Final list lands during the apply phase with user review per class.
 
+**Amendment (PR #5, §2 fixture sampling):** `data/travel.sqlite` has 414 `Cancelled` rows in `flights` but **zero tickets are sold against any cancelled flight** in `ticket_flights`. The dataset models pre-emptive cancellations of unbooked routes, not customer-facing disruption. This means the literal interpretation of "invoice request for a cancelled booking" and "refund question for a cancelled booking" — a `book_ref` whose itinerary contains a cancellation — is unrealizable in this corpus.
+
+The MIX candidates that imply cancellation are reframed as **loose-coupling tasks**: the customer's narrative references a cancelled `flight_no` (which the agent observes via `get_flight_status` → "Cancelled") alongside an unrelated `book_ref` (which the agent observes via `get_booking_status`). The two facts are joined in the customer's claim, not in the schema. This mirrors real customer-support transcripts, where customers routinely describe disruption in terms not perfectly reflected in the booking database.
+
+Practical implications for §§3–6 drafting:
+- The cancelled `flight_no` fixture (`LX0000`) is the cancellation reference; *any* `book_ref` fixture can pair with it.
+- Tasks should be phrased as "my flight LX0000 got cancelled and I have booking 3B54BB" rather than "my booking 3B54BB has a cancelled flight" — the former is verifiable via two tool calls; the latter implies a join the data doesn't support.
+- The rubric for these tasks should reward the agent for calling both `get_flight_status` and `get_booking_status`, and for not assuming the cancellation is reflected in the booking itinerary.
+
 ### Decision 8: EDGE class reframed as three failure-mode probes (amends Decision 7 EDGE candidates)
 
 Decision 7 listed three EDGE candidates by topic. On review, the third candidate ("fare_conditions missing-context") primarily measured agent-loop completeness — did the agent call `get_ticket` before answering? — which is architecture-agnostic and a weak discriminator for an A vs C vs E comparison. The EDGE class is reorganized around three distinct failure-mode probes, each chosen to discriminate across retrieval architectures asymmetrically:

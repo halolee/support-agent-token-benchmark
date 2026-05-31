@@ -92,28 +92,34 @@ def sample_book_refs(con: sqlite3.Connection) -> list[FixtureRow]:
 
 
 def sample_flight_nos(con: sqlite3.Connection) -> list[FixtureRow]:
-    """Three flight_nos spanning status variety; at least one cancelled or delayed."""
+    """Three flight_nos spanning status variety, restricted to LX (Swiss) carrier.
+
+    Carrier restriction matters: corpus is swiss_faq.md (Swiss Air Lines = LX).
+    Picking flight_nos from other carriers (e.g. AA) makes customer-style
+    phrasings semantically incoherent ("I'm a Swiss customer asking about AA…").
+    """
     out: list[FixtureRow] = []
-    seen: set[str] = set()
 
     def pick(status: str, note: str) -> None:
         row = con.execute(
-            "SELECT flight_no FROM flights WHERE status = ? "
+            "SELECT flight_no FROM flights "
+            "WHERE status = ? AND flight_no LIKE 'LX%' "
             "AND flight_no NOT IN (SELECT value FROM picked) "
             "ORDER BY flight_no ASC LIMIT 1",
             (status,),
         ).fetchone()
         if row is None:
-            raise RuntimeError(f"no flight with status={status!r} available")
-        out.append(FixtureRow(value=row[0], rationale=f"flight with status={status!r} — {note}"))
+            raise RuntimeError(f"no LX flight with status={status!r} available")
+        out.append(FixtureRow(value=row[0], rationale=f"LX flight with status={status!r} — {note}"))
         con.execute("INSERT INTO picked(value) VALUES (?)", (row[0],))
-        seen.add(row[0])
 
-    # Use a transient in-memory table to ensure across-pick uniqueness without
-    # threading state through repeated regex/set checks.
     con.execute("CREATE TEMP TABLE picked(value TEXT PRIMARY KEY)")
     try:
-        pick("Cancelled", "exercises refund/rebooking flows in MIX or EDGE tasks")
+        pick("Cancelled", "disruption reference for MIX 'my flight was cancelled' tasks "
+                         "and EDGE 'cancelled booking' loose-coupling pattern (see design.md "
+                         "Decision 7 amendment — no booking in this corpus actually has a "
+                         "cancelled flight in its itinerary, so cancellation is referenced "
+                         "via flight_no, not book_ref)")
         pick("Delayed", "exercises status-check TXN and disruption-handling MIX tasks")
         pick("Scheduled", "baseline upcoming-flight reference for routine TXN lookups")
     finally:
@@ -122,7 +128,15 @@ def sample_flight_nos(con: sqlite3.Connection) -> list[FixtureRow]:
 
 
 def sample_ticket_nos(con: sqlite3.Connection) -> list[FixtureRow]:
-    """Two ticket_nos with distinct non-empty fare_conditions."""
+    """Three ticket_nos covering Business, Comfort, Economy fare classes.
+
+    Expanded from 2 → 3 during PR #5 review (see OpenSpec tasks.md §2.1).
+    Comfort is included because it is a real fare class in travel.sqlite
+    (17k+ tickets) but is NOT covered in swiss_faq.md — this asymmetry makes
+    it the ideal grounding for EDGE-003 (out-of-scope refusal): a customer
+    asking Comfort-specific policy questions should be answered "I don't
+    have that information," not fabricated from low-similarity retrieval.
+    """
     out: list[FixtureRow] = []
 
     # Business — premium fare class, exercises European-fare-concept questions
@@ -133,11 +147,26 @@ def sample_ticket_nos(con: sqlite3.Connection) -> list[FixtureRow]:
     """).fetchone()
     out.append(FixtureRow(
         value=row[0],
-        rationale=f"Business fare ticket — exercises premium fare-class lookups "
-                  f"and European fare concept policy questions",
+        rationale="Business fare ticket — premium fare class covered by "
+                  "swiss_faq.md European fare concept section; supports "
+                  "policy-grounded MIX tasks tying a fare class to FAQ rules",
     ))
 
-    # Economy — most common fare class
+    # Comfort — present in sqlite but NOT in corpus → EDGE-003 grounding
+    row = con.execute("""
+        SELECT ticket_no, fare_conditions FROM ticket_flights
+        WHERE fare_conditions = 'Comfort'
+        ORDER BY ticket_no ASC LIMIT 1
+    """).fetchone()
+    out.append(FixtureRow(
+        value=row[0],
+        rationale="Comfort fare ticket — present in travel.sqlite but NOT "
+                  "discussed in swiss_faq.md; supports EDGE-003 out-of-scope "
+                  "refusal grounding (agent should decline rather than "
+                  "fabricate from low-similarity retrieval)",
+    ))
+
+    # Economy — most common fare class, baseline TXN
     row = con.execute("""
         SELECT ticket_no, fare_conditions FROM ticket_flights
         WHERE fare_conditions = 'Economy'
@@ -145,8 +174,9 @@ def sample_ticket_nos(con: sqlite3.Connection) -> list[FixtureRow]:
     """).fetchone()
     out.append(FixtureRow(
         value=row[0],
-        rationale=f"Economy fare ticket — most common fare class, baseline "
-                  f"reference for routine fare-conditions TXN tasks",
+        rationale="Economy fare ticket — most common fare class, baseline "
+                  "reference for routine fare-conditions TXN tasks and "
+                  "Economy Light/Classic/Flex policy questions",
     ))
     return out
 

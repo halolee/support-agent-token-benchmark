@@ -21,26 +21,30 @@
   ],
   "flight_nos": [
     {
-      "value": "AA0009",
-      "rationale": "flight with status='Cancelled' — exercises refund/rebooking flows in MIX or EDGE tasks"
+      "value": "LX0000",
+      "rationale": "LX flight with status='Cancelled' — disruption reference for MIX 'my flight was cancelled' tasks and EDGE 'cancelled booking' loose-coupling pattern (see design.md Decision 7 amendment — no booking in this corpus actually has a cancelled flight in its itinerary, so cancellation is referenced via flight_no, not book_ref)"
     },
     {
-      "value": "AA0019",
-      "rationale": "flight with status='Delayed' — exercises status-check TXN and disruption-handling MIX tasks"
+      "value": "LX0024",
+      "rationale": "LX flight with status='Delayed' — exercises status-check TXN and disruption-handling MIX tasks"
     },
     {
-      "value": "AA0007",
-      "rationale": "flight with status='Scheduled' — baseline upcoming-flight reference for routine TXN lookups"
+      "value": "LX0002",
+      "rationale": "LX flight with status='Scheduled' — baseline upcoming-flight reference for routine TXN lookups"
     }
   ],
   "ticket_nos": [
     {
       "value": "0010005432293166",
-      "rationale": "Business fare ticket — exercises premium fare-class lookups and European fare concept policy questions"
+      "rationale": "Business fare ticket — premium fare class covered by swiss_faq.md European fare concept section; supports policy-grounded MIX tasks tying a fare class to FAQ rules"
+    },
+    {
+      "value": "0060005432159785",
+      "rationale": "Comfort fare ticket — present in travel.sqlite but NOT discussed in swiss_faq.md; supports EDGE-003 out-of-scope refusal grounding (agent should decline rather than fabricate from low-similarity retrieval)"
     },
     {
       "value": "0010005432112475",
-      "rationale": "Economy fare ticket — most common fare class, baseline reference for routine fare-conditions TXN tasks"
+      "rationale": "Economy fare ticket — most common fare class, baseline reference for routine fare-conditions TXN tasks and Economy Light/Classic/Flex policy questions"
     }
   ]
 }
