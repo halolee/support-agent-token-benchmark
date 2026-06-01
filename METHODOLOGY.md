@@ -59,6 +59,46 @@ The simulated organization has the following team boundaries:
 
 4. **Cross-team interfaces are explicit.** Every tool's input/output schema is part of the inter-team contract. Schema changes are inter-team negotiations, not silent updates.
 
+### Data flow under the constraint
+
+AI Engineering owns the agent loop. Every piece of data the agent reads or writes crosses a team boundary as an explicit tool call — never as a direct file or DB read.
+
+```mermaid
+flowchart LR
+    User([User query]) --> Agent
+
+    subgraph AIE["AI Engineering — owns agent loop, system prompt, tool orchestration"]
+      Agent[Agent]
+    end
+
+    subgraph SC["Support Content — owns FAQ corpus"]
+      ToolSearch["vector_search /<br/>grep_corpus /<br/>hybrid_search"]
+      Corpus[(swiss_faq.md)]
+      ToolSearch -.reads.- Corpus
+    end
+
+    subgraph BS["Booking Systems — owns booking DB"]
+      ToolBooking["get_booking_status<br/>search_flights<br/>search_hotels<br/>search_cars"]
+      DB[(travel.sqlite)]
+      ToolBooking -.reads.- DB
+    end
+
+    subgraph Comp["Compliance — owns audit log"]
+      ToolAudit["audit_log"]
+      Log[(Audit log)]
+      ToolAudit -.writes.- Log
+    end
+
+    Agent -->|tool call| ToolSearch
+    ToolSearch -->|chunks / matches| Agent
+    Agent -->|tool call| ToolBooking
+    ToolBooking -->|booking record| Agent
+    Agent -->|tool call| ToolAudit
+    Agent --> Response([Customer response])
+```
+
+The dotted lines are inside each team's boundary; the solid arrows crossing boundaries are the only sanctioned cross-team data flow. Architecture choice changes which tool Support Content exposes (`vector_search` vs `grep_corpus` vs `hybrid_search`), not the boundary itself.
+
 ### What this constraint changes
 
 Without the constraint, the experiment would measure "what's the cheapest way to do this if one team owns everything" — which is the solo-founder context, not the enterprise context the article targets.
