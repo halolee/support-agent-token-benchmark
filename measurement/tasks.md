@@ -99,6 +99,18 @@ The four classes expose where architectural choice actually matters:
 
 The mixed-heavy distribution is deliberate. Real customer support traffic is overwhelmingly mixed; pure-class questions are minority cases.
 
+## MIX section coverage — intentional gaps
+
+The MIX class exercises 4 of the 9 candidate corpus sections (per `measurement/policy_classes.json`): `faq-european-fare-concept`, `booking-and-cancellation`, `pay-per-invoice`, `faq-payment`. Three sections are **uncovered by MIX by design** because the corpus rules in those sections do not vary with booking attributes — a MIX task drawing on them would have a decorative-only booking lookup, violating the class definition (per `openspec/changes/write-benchmark-tasks/design.md` Decision 7: MIX requires both policy AND booking data to be load-bearing):
+
+- `booking-platform` — UI/device feature gaps (smartphone vs desktop, third-party bookings via app). Rules apply universally regardless of which booking is being viewed.
+- `credit-cards` — card security number digit count by brand (Amex 4-digit front, others 3-digit back). Rule is the same for any booking being paid for.
+- `card-security` — 3-D Secure for EEA cards, PCI-DSS storage standards. Applies regardless of the specific booking.
+
+`invoice-questions` is also untouched in MIX — it shares the 90-vs-100-day re-issuance-window conflict with `ordering-an-invoice` (issue [#14](https://github.com/halolee/support-agent-token-benchmark/issues/14)) and is reserved as a candidate EDGE-002 synthesis-with-conflict framing.
+
+These coverage gaps are limitations of the *class definition* (MIX requires booking-data-load-bearing rules), not of the corpus itself. POL covers some of the same sections (`pay-per-invoice` via POL-001, `ordering-an-invoice` via POL-002, `faq-payment` via POL-003). v2 architectures (Bounded tools, Stuffed corpus — deferred per `ROADMAP.md`) may exercise the booking-data-thin sections through different testing surfaces.
+
 ## Rubric scoring
 
 Each task is scored on three dimensions by an LLM-as-judge (`claude-opus-4-7`):
