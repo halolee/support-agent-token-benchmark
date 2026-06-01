@@ -6,18 +6,18 @@ A measurement framework for comparing retrieval architectures used in LLM-based 
 
 Four implementations of the same customer support task, measured head-to-head with the same task set, the same model, and the same cross-team modularity constraints:
 
-- **Naive RAG (A).** Vector store + top-K retrieval + LLM agent with tool calls. The pattern most tutorials show and most v1 deployments ship.
-- **Cached RAG (A+G).** Same as Naive RAG, with Anthropic's prompt caching enabled. The "have you tried the obvious optimization first" baseline.
-- **Grep search (C).** A `grep`-style keyword search exposed as a single tool. The "traditional retrieval still works" alternative.
-- **Hybrid RAG (E).** Vector + BM25 combined with reranking. The production-standard pattern mature teams converge on.
+- **Naive RAG.** Vector store + top-K retrieval + LLM agent with tool calls. The pattern most tutorials show and most v1 deployments ship.
+- **Cached RAG.** Same as Naive RAG, with Anthropic's prompt caching enabled. The "have you tried the obvious optimization first" baseline.
+- **Grep search.** A `grep`-style keyword search exposed as a single tool. The "traditional retrieval still works" alternative.
+- **Hybrid RAG.** Vector + BM25 combined with reranking. The production-standard pattern mature teams converge on.
 
 Two further architectures are scoped but deferred to v2:
-- **Bounded tools (B)** — one tool per policy class
-- **Stuffed corpus (D)** — full corpus in context, no retrieval
+- **Bounded tools** — one tool per policy class
+- **Stuffed corpus** — full corpus in context, no retrieval
 
-Three more are mentioned in the companion article but not measured: fine-tuned (F), deterministic routing with LLM at the edges (H), and no-LLM-at-all (I).
+Three more are mentioned in the companion article but not measured: fine-tuned, deterministic routing with LLM at the edges, and no-LLM-at-all.
 
-> _Naming note:_ this README uses descriptive names with the article taxonomy letter in parentheses (e.g., "Naive RAG (A)"). Deeper docs (`METHODOLOGY.md`, `ARCHITECTURE_RATIONALE.md`, etc.) still use the letter labels directly while the broader rename is deferred — see issue #4.
+> _Companion article cross-reference:_ the LinkedIn article frames these architectures as a lettered taxonomy (A: Naive RAG, A+G: Cached RAG, B: Bounded tools, C: Grep search, D: Stuffed corpus, E: Hybrid RAG, F: Fine-tuned, H: Deterministic routing, I: No-LLM). The repo uses descriptive names directly; the letters appear only here for readers arriving from the article.
 
 ## Architecture comparison at a glance
 
@@ -33,22 +33,22 @@ flowchart LR
     Q --> C1
     Q --> E1
 
-    subgraph A_lane["Naive RAG (A)"]
+    subgraph A_lane["Naive RAG"]
       direction LR
       A1[Embed query] --> A2[Vector store<br/>top-K] --> A3[Inject chunks<br/>into context]
     end
 
-    subgraph AG_lane["Cached RAG (A+G)"]
+    subgraph AG_lane["Cached RAG"]
       direction LR
       AG1[Embed query] --> AG2[Vector store<br/>top-K] --> AG3[Inject chunks<br/>cached prefix reused]
     end
 
-    subgraph C_lane["Grep search (C)"]
+    subgraph C_lane["Grep search"]
       direction LR
       C1[Extract keywords] --> C2[Grep corpus] --> C3[Inject matches<br/>into context]
     end
 
-    subgraph E_lane["Hybrid RAG (E)"]
+    subgraph E_lane["Hybrid RAG"]
       direction LR
       E1[Embed query<br/>+ keywords] --> E2[Vector + BM25<br/>union] --> E3[Cross-encoder<br/>rerank] --> E4[Inject top-K<br/>into context]
     end
@@ -84,12 +84,12 @@ See `METHODOLOGY.md` §"Modularity constraint" for the full specification and `H
 
 The four measured architectures were chosen against an explicit framework: what is *popular*, what are the *misconceptions*, what is *industry standard*, and what are *our assumptions worth testing*. The full rationale is in `ARCHITECTURE_RATIONALE.md`. Brief summary:
 
-- **Naive RAG (A)** is the popular default and the source of most misconceptions about "RAG."
-- **Cached RAG (A+G)** is the obvious optimization production teams should try before any architectural change.
-- **Grep search (C)** tests the assumption that semantic retrieval is necessary for LLM agents.
-- **Hybrid RAG (E)** is the production-standard pattern; any alternative has to beat this, not the naive baseline.
+- **Naive RAG** is the popular default and the source of most misconceptions about "RAG."
+- **Cached RAG** is the obvious optimization production teams should try before any architectural change.
+- **Grep search** tests the assumption that semantic retrieval is necessary for LLM agents.
+- **Hybrid RAG** is the production-standard pattern; any alternative has to beat this, not the naive baseline.
 
-Bounded tools (B) and Stuffed corpus (D) were considered and deferred. Cutting scope to ship the load-bearing comparison first is itself a deliberate decision; see `ROADMAP.md` for v2 scope.
+Bounded tools and Stuffed corpus were considered and deferred. Cutting scope to ship the load-bearing comparison first is itself a deliberate decision; see `ROADMAP.md` for v2 scope.
 
 ## Quick start
 
@@ -101,7 +101,7 @@ pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
 
 # Run the benchmark on all v1 architectures
-python measurement/runner.py --architectures a,a_cached,c,e --tasks measurement/tasks.jsonl
+python measurement/runner.py --architectures naive_rag,cached_rag,grep_search,hybrid_rag --tasks measurement/tasks.jsonl
 
 # Generate the comparison report
 python measurement/runner.py --report
@@ -124,10 +124,10 @@ Expected runtime: ~8–10 minutes for the full task set across all four architec
 ├── data/
 │   └── travel.sqlite                  # Booking data (sourced from LangGraph tutorial)
 ├── architectures/
-│   ├── a_naive_rag/                   # Vector store + top-K retrieval
-│   ├── c_grep/                        # Keyword search as a tool
-│   └── e_hybrid_rag/                  # Vector + BM25 + reranking
-├── architectures_deferred/            # Placeholders for B and D (v2)
+│   ├── naive_rag/                   # Vector store + top-K retrieval
+│   ├── grep_search/                        # Keyword search as a tool
+│   └── hybrid_rag/                  # Vector + BM25 + reranking
+├── architectures_deferred/            # Placeholders for Bounded tools and Stuffed corpus (v2)
 ├── measurement/
 │   ├── runner.py                      # Orchestrates measurement runs
 │   ├── tokens.py                      # Token accounting
@@ -143,12 +143,12 @@ Expected runtime: ~8–10 minutes for the full task set across all four architec
 
 > _To be populated after measurement runs. Structure below indicates what will be reported._
 
-| Architecture       | Mean tokens / task | Cost / task | Success rate | Mean latency |
-|--------------------|--------------------|-------------|--------------|--------------|
-| Naive RAG (A)      | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| Cached RAG (A+G)   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| Grep search (C)    | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| Hybrid RAG (E)     | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Architecture | Mean tokens / task | Cost / task | Success rate | Mean latency |
+|--------------|--------------------|-------------|--------------|--------------|
+| Naive RAG    | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Cached RAG   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Grep search  | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Hybrid RAG   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
 
 Per-task-class breakdowns and the full discussion are in `measurement/results/comparison.md`.
 
@@ -167,7 +167,7 @@ Full details in `METHODOLOGY.md`.
 
 ## Related work
 
-- [LangGraph customer support tutorial](https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb) — Naive RAG (A) is closely modeled on this; corpus and database forked from here.
+- [LangGraph customer support tutorial](https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb) — Naive RAG is closely modeled on this; corpus and database forked from here.
 - [Silicon Data, _Understanding LLM Cost Per Token_](https://www.silicondata.com/blog/llm-cost-per-token) — Token decomposition methodology.
 - [SolDevelo, _A real-world test of RAG vs. Direct API calls_](https://soldevelo.com/blog/a-real-world-test-of-rag-vs-direct-api-calls/) — Independent measurement; relevant precedent.
 

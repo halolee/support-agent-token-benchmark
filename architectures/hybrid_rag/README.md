@@ -1,12 +1,12 @@
-# Architecture E — Hybrid RAG
+# Hybrid RAG
 
 Vector search + BM25 keyword search combined, with a reranking pass on merged results. The production-standard pattern mature teams converge on.
 
 ## Why this architecture is in the comparison
 
-See `ARCHITECTURE_RATIONALE.md`. Brief: Without E, the comparison is against a strawman. Naive RAG (A) is not what production teams actually run after iterating past v1. Hybrid RAG with reranking is. Any alternative that beats A but loses to E is not actually a win — it's just better than the tutorial pattern.
+See `ARCHITECTURE_RATIONALE.md`. Brief: Without Hybrid RAG, the comparison is against a strawman. Naive RAG is not what production teams actually run after iterating past v1. Hybrid RAG with reranking is. Any alternative that beats Naive RAG but loses to Hybrid RAG is not actually a win — it's just better than the tutorial pattern.
 
-E is the real benchmark.
+Hybrid RAG is the real benchmark.
 
 ## Files
 
@@ -23,13 +23,13 @@ E is the real benchmark.
 - **Booking Systems' interface:** Identical to all other architectures
 - **Compliance interface:** Identical
 
-Support Content's operational burden is highest with E — they maintain both indices, the reranking model, and the combination logic. This is part of E's cost story even though it's not reflected in per-call tokens.
+Support Content's operational burden is highest with Hybrid RAG — they maintain both indices, the reranking model, and the combination logic. This is part of Hybrid RAG's cost story even though it's not reflected in per-call tokens.
 
 ## Design choices
 
 ### Retrieval
 
-- **Vector component:** Same as Architecture A (`BAAI/bge-m3` self-hosted embedding, top-K from vector store)
+- **Vector component:** Same as Naive RAG (`BAAI/bge-m3` self-hosted embedding, top-K from vector store)
 - **Keyword component:** BM25 (via `rank_bm25` library) over the same chunked corpus
 - **Combination:** Reciprocal Rank Fusion (RRF) to merge vector and BM25 results
 - **Reranking:** Cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2` or similar lightweight model) over merged candidates
@@ -52,7 +52,7 @@ All tool implementations use parameterized SQL queries; no string concatenation 
 
 ### Prompts
 
-System prompt similar to A's (~500 tokens). The agent doesn't need to know about the hybrid retrieval internals — it just calls the search tool. The agent-facing API is the same as A; only Support Content's implementation differs.
+System prompt similar to A's (~500 tokens). The agent doesn't need to know about the hybrid retrieval internals — it just calls the search tool. The agent-facing API is the same as Naive RAG; only Support Content's implementation differs.
 
 ## What "done" looks like
 
@@ -71,4 +71,4 @@ System prompt similar to A's (~500 tokens). The agent doesn't need to know about
 
 ## What this architecture demonstrates
 
-If E is the cheapest, the answer is "use mature RAG, not tutorial RAG." If A+G (cached A) matches E on cost while losing slightly on quality, the answer is "cache before complicating." If C matches E on cost AND quality, the answer is "you may not need the complexity at all." E provides the floor for "what production-grade RAG actually costs," which is the load-bearing comparison the article needs.
+If E is the cheapest, the answer is "use mature RAG, not tutorial RAG." If Cached RAG (cached A) matches E on cost while losing slightly on quality, the answer is "cache before complicating." If C matches E on cost AND quality, the answer is "you may not need the complexity at all." E provides the floor for "what production-grade RAG actually costs," which is the load-bearing comparison the article needs.

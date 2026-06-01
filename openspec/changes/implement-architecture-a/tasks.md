@@ -2,14 +2,14 @@
 
 ## 1. Vector store setup
 
-- [ ] 1.1 Implement `setup_vector_store.py` to chunk `corpus/swiss_faq.md` per the chunking strategy in `architectures/a_naive_rag/README.md` (H2 boundaries, ~300-500 tokens, paragraph-split for overflow chunks above 500 tokens)
-- [ ] 1.2 Embed chunks with BGE-M3 via `sentence-transformers` or `FlagEmbedding` and persist to ChromaDB (or FAISS) in `architectures/a_naive_rag/vector_store/`
+- [ ] 1.1 Implement `setup_vector_store.py` to chunk `corpus/swiss_faq.md` per the chunking strategy in `architectures/naive_rag/README.md` (H2 boundaries, ~300-500 tokens, paragraph-split for overflow chunks above 500 tokens)
+- [ ] 1.2 Embed chunks with BGE-M3 via `sentence-transformers` or `FlagEmbedding` and persist to ChromaDB (or FAISS) in `architectures/naive_rag/vector_store/`
 - [ ] 1.3 Confirm chunk count matches expectation from Phase 1 Step 0 corpus inventory; embedding dimensions match BGE-M3 (1024)
 
 ## 2. Inter-team tools (modularity constraint)
 
 - [ ] 2.1 Implement `vector_search(query: str, k: int = 4)` in `tools.py` as Support Content's interface; returns list of chunks with source markers
-- [ ] 2.2 Wire in shared Booking Systems tools (`get_booking_status`, `search_flights`, `search_hotels`, `search_cars`) — these may live in a shared module if extracted later, but Architecture A is responsible for getting them working first
+- [ ] 2.2 Wire in shared Booking Systems tools (`get_booking_status`, `search_flights`, `search_hotels`, `search_cars`) — these may live in a shared module if extracted later, but Naive RAG is responsible for getting them working first
 - [ ] 2.3 Wire in Compliance's `audit_log(task_id, response, tools_called)` per the uniform payload spec in METHODOLOGY §"Audit log specification"
 - [ ] 2.4 Verify agent code does NOT read `corpus/swiss_faq.md` or query `data/travel.sqlite` directly — only through the tools above. This is the modularity constraint check.
 - [ ] 2.5 Tool implementations use parameterized SQL queries throughout (`?` placeholders in SQLite); no f-string or `%` concatenation of user input into queries. Code-quality requirement per architecture README.

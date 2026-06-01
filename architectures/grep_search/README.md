@@ -1,4 +1,4 @@
-# Architecture C — Grep
+# Grep search
 
 Keyword search exposed as a tool. The agent picks search terms; grep returns matching lines with context.
 
@@ -18,11 +18,11 @@ The bet: LLMs are excellent at picking keywords. They don't need vector search t
 
 ## Modularity constraint compliance
 
-Per METHODOLOGY, all architectures respect simulated team boundaries. This matters especially for C because naive "grep" implies file system access, which would violate the boundary.
+Per METHODOLOGY, all architectures respect simulated team boundaries. This matters especially for Grep search because naive "grep" implies file system access, which would violate the boundary.
 
 - **Support Content's interface:** `grep_corpus(keywords: list[str], max_results: int = 10) -> list[Match]`. Implemented as a tool exposed by Support Content. AI Engineering's agent does NOT shell out to grep directly on the corpus file — it calls the tool, which performs the search inside Support Content's owned code path.
-- **Booking Systems' interface:** Identical to Architecture A
-- **Compliance interface:** Identical to Architecture A
+- **Booking Systems' interface:** Identical to Naive RAG
+- **Compliance interface:** Identical to Naive RAG
 
 The grep tool is structured to feel like grep — case-insensitive substring matching, returns matching lines with N lines of context, truncates results — but it's exposed as a structured tool with a defined contract, not as raw shell access.
 
@@ -53,7 +53,7 @@ System prompt should:
 - Encourage iterative search if first attempt returns too few or irrelevant results
 - Explain how to interpret grep results (matching lines with context, not full document sections)
 
-Target ~300-400 tokens. The prompt can be tighter than A's because there's less retrieval orchestration to explain.
+Target ~300-400 tokens. The prompt can be tighter than Naive RAG's because there's less retrieval orchestration to explain.
 
 ## What "done" looks like
 

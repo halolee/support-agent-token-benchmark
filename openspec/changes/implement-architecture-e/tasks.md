@@ -2,8 +2,8 @@
 
 ## 1. Indices setup
 
-- [ ] 1.1 Reuse Architecture A's chunking strategy on `corpus/swiss_faq.md`. If A's chunking lives in a non-shared script, extract to a shared helper to ensure parity.
-- [ ] 1.2 Build vector store with BGE-M3 embeddings (same model as A) in `architectures/e_hybrid_rag/vector_store/`
+- [ ] 1.1 Reuse Naive RAG's chunking strategy on `corpus/swiss_faq.md`. If Naive RAG's chunking lives in a non-shared script, extract to a shared helper to ensure parity.
+- [ ] 1.2 Build vector store with BGE-M3 embeddings (same model as Naive RAG) in `architectures/hybrid_rag/vector_store/`
 - [ ] 1.3 Build BM25 index via `rank_bm25` over the same chunked corpus; persist alongside vector store
 - [ ] 1.4 Verify both indices return sensible results for a few test queries before integrating
 
@@ -18,13 +18,13 @@
 
 ## 3. Reuse shared tools
 
-- [ ] 3.1 Wire in Booking Systems tools (identical to A and C)
+- [ ] 3.1 Wire in Booking Systems tools (identical to Naive RAG and Grep search)
 - [ ] 3.2 Wire in Compliance's `audit_log` per the uniform payload spec
 
 ## 4. Agent loop
 
-- [ ] 4.1 Write system prompt in `prompts.py` targeting ~500 tokens (similar to A — the agent doesn't need to know about hybrid internals; it just calls one search tool)
-- [ ] 4.2 Implement agent loop — same shape as A and C
+- [ ] 4.1 Write system prompt in `prompts.py` targeting ~500 tokens (similar to Naive RAG — the agent doesn't need to know about hybrid internals; it just calls one search tool)
+- [ ] 4.2 Implement agent loop — same shape as Naive RAG and Grep search
 - [ ] 4.3 Instrument token counting at every model call
 
 ## 5. Tuning targets (for adversarial review)

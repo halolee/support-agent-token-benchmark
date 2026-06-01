@@ -19,7 +19,7 @@ Before designing anything, get the corpus and database in place and inventory wh
   - `curl -L -o data/travel.sqlite https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite` *(exact filename — likely `travel2.sqlite` — should be confirmed from the tutorial's `db.py` setup cell; rename the downloaded file to `travel.sqlite` after download to match the path references throughout these docs)*
 - [ ] Verify integrity: `file data/travel.sqlite` should report "SQLite 3.x database"; `head corpus/swiss_faq.md` should show non-empty Markdown
 - [ ] For tutorial context, browse the canonical notebook at `https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb` — note what tools it defines and what dialog routing it uses. The LangGraph project restructured; the latest docs index is at `https://docs.langchain.com/oss/python/langgraph/overview` (the older `examples/customer-support/` path is deprecated).
-- [ ] Read `swiss_faq.md` to inventory the actual policy classes present (count them, note vocabulary). This affects task design (Phase 2 Step 4) and implementation choices for A, C, and E.
+- [ ] Read `swiss_faq.md` to inventory the actual policy classes present (count them, note vocabulary). This affects task design (Phase 2 Step 4) and implementation choices for Naive RAG, Grep search, and Hybrid RAG.
 - [ ] Inspect `travel.sqlite` schema (tables, columns, row counts, sample data)
 - [ ] Document findings in a brief `notebooks/00_corpus_inventory.ipynb` — what we're working with. Record the source URLs verbatim so future reproducers have a fixed starting point.
 
@@ -51,7 +51,7 @@ This is the load-bearing measurement code. Build it before any architecture, bec
 ### Step 3: Runner skeleton
 
 - [ ] Implement `measurement/runner.py` with:
-  - `--architectures <list>` argument (e.g., `a,a_cached,c,e`)
+  - `--architectures <list>` argument (e.g., `naive_rag,cached_rag,grep_search,hybrid_rag`)
   - `--tasks <path>` argument
   - `--runs <int>` argument (default 3)
   - Output to `measurement/results/architecture_<id>.json`
@@ -64,7 +64,7 @@ A repo where `pip install -r requirements.txt && python measurement/runner.py --
 
 ---
 
-## Phase 2 — Core comparison (A, C, E)
+## Phase 2 — Core comparison (Naive RAG, Grep search, Hybrid RAG)
 
 **Goal:** Three architectures implemented, full task set run, adversarial review complete, comparison report populated.
 
@@ -78,29 +78,29 @@ A repo where `pip install -r requirements.txt && python measurement/runner.py --
 - [ ] Manually answer each task yourself to confirm it's well-defined
 - [ ] Document expected_citations for each task
 
-### Step 5: Architecture A — Naive RAG
+### Step 5: Naive RAG
 
-Follow `architectures/a_naive_rag/README.md` design choices:
+Follow `architectures/naive_rag/README.md` design choices:
 - [ ] Chunk `corpus/swiss_faq.md` (Support Content team's process, conceptually)
-- [ ] Set up vector store (Chroma or FAISS, in `architectures/a_naive_rag/vector_store/`)
+- [ ] Set up vector store (Chroma or FAISS, in `architectures/naive_rag/vector_store/`)
 - [ ] Implement Support Content's tool: `vector_search(query, k=4)` returning chunks
 - [ ] Implement Booking Systems' tools: `get_booking_status`, `search_flights`, etc.
 - [ ] Implement system prompt (~500 tokens, comparable in care to other architectures)
-- [ ] Implement agent loop in `architectures/a_naive_rag/agent.py`
+- [ ] Implement agent loop in `architectures/naive_rag/agent.py`
 - [ ] Smoke test with 2-3 tasks
 
-### Step 6: Architecture C — Grep
+### Step 6: Grep search
 
-Follow `architectures/c_grep/README.md` design choices:
+Follow `architectures/grep_search/README.md` design choices:
 - [ ] Implement Support Content's tool: `grep_corpus(keywords, max_results=10)` — case-insensitive, returns matching lines with surrounding context
-- [ ] Reuse Booking Systems' tools from A (they're identical across architectures)
+- [ ] Reuse Booking Systems' tools from Naive RAG (they're identical across architectures)
 - [ ] Implement system prompt — instruct agent to pick search keywords and call grep
 - [ ] Implement agent loop
 - [ ] Smoke test with 2-3 tasks
 
-### Step 7: Architecture E — Hybrid RAG
+### Step 7: Hybrid RAG
 
-Follow `architectures/e_hybrid_rag/README.md` design choices:
+Follow `architectures/hybrid_rag/README.md` design choices:
 - [ ] Implement Support Content's tool: `hybrid_search(query, k=6)` combining BM25 + vector retrieval with reranking
 - [ ] Reuse Booking Systems' tools
 - [ ] Implement system prompt
@@ -109,7 +109,7 @@ Follow `architectures/e_hybrid_rag/README.md` design choices:
 
 ### Step 8: Full run
 
-- [ ] Run `python measurement/runner.py --architectures a,c,e --runs 3`
+- [ ] Run `python measurement/runner.py --architectures naive_rag,grep_search,hybrid_rag --runs 3`
 - [ ] Inspect results for sanity (no architecture should have 0% success; tokens should be in expected order of magnitude)
 - [ ] Fix any bugs the run surfaces
 
@@ -123,7 +123,7 @@ Follow `architectures/e_hybrid_rag/README.md` design choices:
 
 Per METHODOLOGY §"Pre-publication adversarial review."
 
-- [ ] **Check 1 — Equal tuning effort.** A's top-K tuned? E's hybrid weighting tuned? C's grep polished? All system prompts equivalently sized? Document in `comparison.md` tuning effort table.
+- [ ] **Check 1 — Equal tuning effort.** Naive RAG's top-K tuned? Hybrid RAG's hybrid weighting tuned? Grep search's grep polished? All system prompts equivalently sized? Document in `comparison.md` tuning effort table.
 - [ ] **Check 2 — Task set neutrality.** Re-read every task. Do phrasings favor any architecture? Document findings.
 - [ ] **Check 3 — Counterfactual reasoning.** For each headline finding, articulate what would have to be true for it to reverse. Fill in counterfactual section.
 - [ ] **Steel-man the null.** Write out the strongest "this shows nothing meaningful" argument. Address it.
@@ -135,37 +135,37 @@ Three architectures measured, comparison report populated with real numbers, adv
 
 ---
 
-## Phase 3 — Caching variant (A+G)
+## Phase 3 — Caching variant (Cached RAG)
 
-**Goal:** Measure A with Anthropic prompt caching enabled. Quantify how much caching collapses A's cost.
+**Goal:** Measure Naive RAG with Anthropic prompt caching enabled. Quantify how much caching collapses Naive RAG's cost.
 
 **Estimated effort:** 0.5 day
 
-### Step 11: Implement A+G
+### Step 11: Implement Cached RAG
 
-- [ ] Copy `architectures/a_naive_rag/` to `architectures/a_naive_rag_cached/` (or add a `--cached` flag to the existing A agent)
+- [ ] Copy `architectures/naive_rag/` to `architectures/naive_rag_cached/` (or add a `--cached` flag to the existing Naive RAG agent)
 - [ ] Enable prompt caching on the system prompt (always cacheable)
 - [ ] Enable caching on retrieved chunks when stable (this requires thinking about what "stable" means — chunks retrieved with same query are cacheable; different queries are not)
 - [ ] Document the caching configuration explicitly in the architecture README
 
 ### Step 12: Run and integrate
 
-- [ ] Run A+G on the full task set, 3 runs
-- [ ] Add A+G column to comparison report
-- [ ] Update adversarial review to cover A+G (Check 1: is caching configured to maximize stable-prefix reuse?)
+- [ ] Run Cached RAG on the full task set, 3 runs
+- [ ] Add Cached RAG column to comparison report
+- [ ] Update adversarial review to cover Cached RAG (Check 1: is caching configured to maximize stable-prefix reuse?)
 
 ### Phase 3 deliverable
 
-Four architectures measured. Comparison report shows caching effect quantified. Article can now honestly claim "A vs. C, but here's what A looks like with the obvious optimization enabled."
+Four architectures measured. Comparison report shows caching effect quantified. Article can now honestly claim "Naive RAG vs. Grep search, but here's what Naive RAG looks like with the obvious optimization enabled."
 
 ---
 
-## Phase 4 — Deferred architectures (B, D) — optional, not v1
+## Phase 4 — Deferred architectures (Bounded tools, Stuffed corpus) — optional, not v1
 
-Per ROADMAP, B and D are deferred. Build only if Phase 2-3 results suggest they'd add to the picture, or if reviewers push back.
+Per ROADMAP, Bounded tools and Stuffed corpus are deferred. Build only if Phase 2-3 results suggest they'd add to the picture, or if reviewers push back.
 
-- [ ] **Architecture B — Bounded structured tools** — ~1 day if added
-- [ ] **Architecture D — Full corpus stuffed** — ~0.5 day if added
+- [ ] **Bounded tools** — ~1 day if added
+- [ ] **Stuffed corpus** — ~0.5 day if added
 
 If skipping, ensure the article and HANDOVER document explicitly note these were considered and why deferred.
 
@@ -185,11 +185,11 @@ If skipping, ensure the article and HANDOVER document explicitly note these were
 
 The build will surface decisions that aren't pre-specified. Document each in `notebooks/` or as a brief ADR. Likely ones:
 
-- **Chunk size for A and E.** The README suggests 300-500 tokens. Actual best value depends on corpus structure (discovered in Phase 1).
-- **Top-K for A.** Default is 4. Tune based on Phase 2 smoke tests.
-- **Hybrid weighting for E.** BM25 vs vector weighting needs tuning per corpus.
-- **Reranking model for E.** Cross-encoder choice affects cost and quality.
-- **Grep result truncation for C.** Too short loses information; too long wastes tokens. Tune in Phase 2.
+- **Chunk size for Naive RAG and Hybrid RAG.** The README suggests 300-500 tokens. Actual best value depends on corpus structure (discovered in Phase 1).
+- **Top-K for Naive RAG.** Default is 4. Tune based on Phase 2 smoke tests.
+- **Hybrid weighting for Hybrid RAG.** BM25 vs vector weighting needs tuning per corpus.
+- **Reranking model for Hybrid RAG.** Cross-encoder choice affects cost and quality.
+- **Grep result truncation for Grep search.** Too short loses information; too long wastes tokens. Tune in Phase 2.
 - **Judge model behavior.** If `claude-opus-4-7` systematically rates one architecture higher despite manual review disagreeing, document and consider alternative judges.
 
 ## Out of scope for v1
@@ -198,7 +198,7 @@ These are explicitly deferred (also in ROADMAP):
 
 - Multi-turn dialogue (single-turn only)
 - Multiple agent models (single-model comparison)
-- Architectures B, D, F, H, I (mentioned in article, not measured)
+- Bounded tools, Stuffed corpus, Fine-tuned, Deterministic routing, No-LLM (mentioned in article, not measured)
 - Production hardening (no rate limit handling beyond SDK defaults)
 - Multi-language (English only)
 - Frontend / UI (CLI only)

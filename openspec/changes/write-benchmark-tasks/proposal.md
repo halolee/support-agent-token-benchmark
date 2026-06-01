@@ -31,5 +31,5 @@ None. No existing specs in `openspec/specs/`.
 - **New files:** `tests/test_tasks.py`, `measurement/tasks.jsonl`, `measurement/tasks_expected_answers.md`, `measurement/policy_classes.json`, `measurement/task_fixtures.json`, `measurement/scripts/sample_fixtures.py` (one-time use, kept for reproducibility).
 - **Modified files:** `measurement/tasks.md` (deprecate seeds, link to frozen set), `requirements.txt` (add `jsonschema` or `pydantic` if not already pinned), possibly `.github/workflows/*` if CI exists (validator should run).
 - **Depends on:** `corpus/swiss_faq.md` and `data/travel.sqlite` being present (Phase 1 Step 0 — already done).
-- **Blocks:** Phase 2 Steps 5-10 (Architecture A/C/E full runs, LLM-as-judge scoring, adversarial review) — all consume `tasks.jsonl`.
+- **Blocks:** Phase 2 Steps 5-10 (Naive RAG/C/E full runs, LLM-as-judge scoring, adversarial review) — all consume `tasks.jsonl`.
 - **Frozen-on-merge constraint:** every `task_id` shipped in this change becomes immutable. Future edits require new IDs and a deprecation note. The validator is the safeguard.

@@ -1,4 +1,4 @@
-# Architecture A — Naive RAG
+# Naive RAG
 
 The canonical tutorial pattern. Vector store, top-K retrieval, LLM agent with tool calls.
 

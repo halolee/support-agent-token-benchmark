@@ -15,24 +15,24 @@
 
 ## Headline numbers
 
-| Architecture       | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
-|--------------------|--------------------------|------------------|------------------|--------------|--------------|
-| A — Naive RAG      | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| A+G — A w/ cache   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| C — Grep           | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| E — Hybrid RAG     | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Architecture | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
+|--------------|--------------------------|------------------|------------------|--------------|--------------|
+| Naive RAG    | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Cached RAG   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Grep search  | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Hybrid RAG   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
 
 ### Scope of measurement: the cache matrix
 
-The four measured architectures span three retrieval strategies (A, C, E) with caching enabled on one (A+G). The full architecture × caching matrix has six cells; v1 measures four. The unmeasured cells are deferred to v2 per `ROADMAP.md`, not omitted.
+The four measured architectures span three retrieval strategies (Naive RAG, Grep search, Hybrid RAG) with caching enabled on one (Cached RAG). The full architecture × caching matrix has six cells; v1 measures four. The unmeasured cells are deferred to v2 per `ROADMAP.md`, not omitted.
 
-|                  | Cache Off       | Cache On                |
-|------------------|-----------------|-------------------------|
-| A (Naive RAG)    | ✓ measured      | ✓ measured (= A+G)      |
-| C (Grep)         | ✓ measured      | deferred to v2          |
-| E (Hybrid RAG)   | ✓ measured      | deferred to v2          |
+|              | Cache Off       | Cache On                       |
+|--------------|-----------------|--------------------------------|
+| Naive RAG    | ✓ measured      | ✓ measured (= Cached RAG)      |
+| Grep search  | ✓ measured      | deferred to v2                 |
+| Hybrid RAG   | ✓ measured      | deferred to v2                 |
 
-Reading the matrix: v1 measures the effect of caching on the canonical pattern (A vs A+G) as a representative datapoint. Whether caching produces a comparable effect on C and E is a v2 question, triggered by whether A+G's caching effect is dramatic enough that the same question becomes important for the other architectures. This is a deliberate scope choice, not an omission.
+Reading the matrix: v1 measures the effect of caching on the canonical pattern (Naive RAG vs Cached RAG) as a representative datapoint. Whether caching produces a comparable effect on Grep search and Hybrid RAG is a v2 question, triggered by whether Cached RAG's caching effect is dramatic enough that the same question becomes important for the other architectures. This is a deliberate scope choice, not an omission.
 
 ## Per-class breakdown
 
@@ -42,10 +42,10 @@ The interesting question is whether the architectures perform differently on dif
 
 | Architecture       | Mean tokens | Mean cost | Success rate |
 |--------------------|-------------|-----------|--------------|
-| A                  | _TBD_       | $_TBD_    | _TBD_%       |
-| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
-| C                  | _TBD_       | $_TBD_    | _TBD_%       |
-| E                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Naive RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Cached RAG                | _TBD_       | $_TBD_    | _TBD_%       |
+| Grep search                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Hybrid RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
 
 **Observation:** _TBD — does the contrarian C architecture hold its own on the case where RAG is theoretically strongest?_
 
@@ -53,10 +53,10 @@ The interesting question is whether the architectures perform differently on dif
 
 | Architecture       | Mean tokens | Mean cost | Success rate |
 |--------------------|-------------|-----------|--------------|
-| A                  | _TBD_       | $_TBD_    | _TBD_%       |
-| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
-| C                  | _TBD_       | $_TBD_    | _TBD_%       |
-| E                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Naive RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Cached RAG                | _TBD_       | $_TBD_    | _TBD_%       |
+| Grep search                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Hybrid RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
 
 **Observation:** _TBD — control class; all architectures should perform similarly. If they don't, why?_
 
@@ -64,10 +64,10 @@ The interesting question is whether the architectures perform differently on dif
 
 | Architecture       | Mean tokens | Mean cost | Success rate |
 |--------------------|-------------|-----------|--------------|
-| A                  | _TBD_       | $_TBD_    | _TBD_%       |
-| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
-| C                  | _TBD_       | $_TBD_    | _TBD_%       |
-| E                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Naive RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Cached RAG                | _TBD_       | $_TBD_    | _TBD_%       |
+| Grep search                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Hybrid RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
 
 **Observation:** _TBD — this is where production traffic lives. Differences here matter most._
 
@@ -75,10 +75,10 @@ The interesting question is whether the architectures perform differently on dif
 
 | Architecture       | Mean tokens | Mean cost | Success rate |
 |--------------------|-------------|-----------|--------------|
-| A                  | _TBD_       | $_TBD_    | _TBD_%       |
-| A+G                | _TBD_       | $_TBD_    | _TBD_%       |
-| C                  | _TBD_       | $_TBD_    | _TBD_%       |
-| E                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Naive RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Cached RAG                | _TBD_       | $_TBD_    | _TBD_%       |
+| Grep search                  | _TBD_       | $_TBD_    | _TBD_%       |
+| Hybrid RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
 
 **Observation:** _TBD — edge cases often expose failure modes that aggregate metrics hide._
 
@@ -99,13 +99,13 @@ flowchart LR
 
 The architecture comparison lives in category ②. Categories ①, ③, ④ are approximately constant within an architecture; category ⑤ is bounded by the agent's `max_tokens` and varies with task. Architecture differences in mean tokens per task are driven primarily by ② (retrieved/injected context).
 
-| Component                       | A (mean) | A+G (mean) | C (mean) | E (mean) | Notes |
+| Component                       | Naive RAG (mean) | Cached RAG (mean) | Grep search (mean) | Hybrid RAG (mean) | Notes |
 |---------------------------------|----------|------------|----------|----------|-------|
 | System prompt                   | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Should be comparable across architectures |
-| Retrieved/injected context      | _TBD_    | _TBD_      | _TBD_    | _TBD_    | A/E: vector chunks. C: grep matches |
+| Retrieved/injected context      | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Naive RAG/E: vector chunks. C: grep matches |
 | User message                    | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Identical across architectures |
 | Tool call overhead              | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Tool schemas differ per architecture |
-| Cache reads (A+G only)          | n/a      | _TBD_      | n/a      | n/a      | Negative cost contribution |
+| Cache reads (Cached RAG only)          | n/a      | _TBD_      | n/a      | n/a      | Negative cost contribution |
 | Response                        | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Should be similar; if not, why? |
 
 ## Variance and reliability
@@ -120,10 +120,10 @@ If CoV exceeds 10%, results are exploratory. Re-run with more samples.
 
 The Silicon Data piece reports a reference workload of 3,150 input + 400 output tokens per ticket. This corresponds to a particular naive RAG configuration (system prompt 500 + chunks 2,500 + user 150 + response 400).
 
-Our Architecture A configuration: _TBD — compare to Silicon Data reference_
-Our Architecture A+G: _TBD — measure of how much caching collapses A_
-Our Architecture E: _TBD — production-grade RAG vs. naive_
-Our Architecture C: _TBD — non-semantic alternative_
+Our Naive RAG configuration: _TBD — compare to Silicon Data reference_
+Our Cached RAG: _TBD — measure of how much caching collapses A_
+Our Hybrid RAG: _TBD — production-grade RAG vs. naive_
+Our Grep search: _TBD — non-semantic alternative_
 
 ## Confidence and known biases
 
@@ -133,10 +133,10 @@ This section documents the adversarial review (per METHODOLOGY) of the published
 
 | Architecture | Tuning applied                                                | Effort level | Honest assessment |
 |--------------|---------------------------------------------------------------|--------------|-------------------|
-| A            | _TBD: top-K choice, chunk strategy_                          | _TBD_        | _TBD_             |
-| A+G          | _TBD: caching configuration_                                 | _TBD_        | _TBD_             |
-| C            | _TBD: grep polish, keyword strategy in prompt_               | _TBD_        | _TBD_             |
-| E            | _TBD: BM25 weighting, reranker choice_                       | _TBD_        | _TBD_             |
+| Naive RAG            | _TBD: top-K choice, chunk strategy_                          | _TBD_        | _TBD_             |
+| Cached RAG          | _TBD: caching configuration_                                 | _TBD_        | _TBD_             |
+| Grep search            | _TBD: grep polish, keyword strategy in prompt_               | _TBD_        | _TBD_             |
+| Hybrid RAG            | _TBD: BM25 weighting, reranker choice_                       | _TBD_        | _TBD_             |
 
 If effort levels differ meaningfully, document the direction of the resulting bias: _TBD_
 
@@ -150,14 +150,14 @@ If effort levels differ meaningfully, document the direction of the resulting bi
 
 For each headline finding, articulate what would have to be true for it to reverse.
 
-**If A+G is cheapest:** Under what conditions would caching's advantage evaporate?
+**If Cached RAG is cheapest:** Under what conditions would caching's advantage evaporate?
 - Highly variable system prompts: _TBD_
 - Cache eviction at scale: _TBD_
 - Low repeat-prefix rate in production: _TBD_
 
 **If C is cheapest but loses on success rate:** Document the cost/competence frontier explicitly: _TBD_
 
-**If E wins overall:** Under what conditions would naive A or grep C be preferable?
+**If E wins overall:** Under what conditions would naive Naive RAG or grep C be preferable?
 - Smaller corpus: _TBD_
 - Simpler queries: _TBD_
 - Different cost sensitivities: _TBD_
@@ -183,7 +183,7 @@ Defensible claims based on these numbers:
 - Under the specified configuration and task set, Architecture _X_ uses _TBD_% fewer input tokens than Architecture _Y_ per task
 - The cost difference per task is $_TBD_, or $_TBD_ at the scale of 10,000 tasks
 - Architecture _Z_ achieves _TBD_% task success rate, while _W_ achieves _TBD_%
-- Prompt caching (A vs A+G) reduces per-task cost by _TBD_% on this workload
+- Prompt caching (A vs Cached RAG) reduces per-task cost by _TBD_% on this workload
 
 Claims this measurement does **not** support:
 
@@ -196,9 +196,9 @@ Claims this measurement does **not** support:
 
 > _Populated after v1 results are in. Candidates listed in ROADMAP.md._
 
-1. Architecture B (bounded structured tools) — if reviewers argue B and E differ meaningfully
-2. Architecture D (full corpus stuffed) — if A and E pay heavily for retrieval that corpus size doesn't justify
-3. Caching variants for E and C — to isolate whether caching's advantage is A-specific
+1. Bounded tools (bounded structured tools) — if reviewers argueBounded tools and Hybrid RAGdiffer meaningfully
+2. Stuffed corpus (full corpus stuffed) — if Naive RAG and Hybrid RAG pay heavily for retrieval that corpus size doesn't justify
+3. Caching variants for Hybrid RAG and Grep search — to isolate whether caching's advantage is Naive-RAG-specific
 4. Cheaper model comparison — does the architectural advantage hold at lower price points?
 5. Multi-turn dialogue — caching effects and architectural differences likely compound
 6. Larger task set (50-100 tasks) — tighten statistical confidence

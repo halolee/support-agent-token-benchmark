@@ -54,7 +54,7 @@ The constraint matters because architecture decisions are constrained by who own
 
 ## 4. Architectures evaluated
 
-### Architecture A — Naive RAG
+### Naive RAG
 
 The pattern most tutorials show and most v1 deployments ship.
 
@@ -82,15 +82,15 @@ flowchart LR
 
 **Operational requirements for Support Content:** Vector store re-indexing when FAQ corpus changes. Embedding model lifecycle management.
 
-### Architecture A+G — Naive RAG with prompt caching
+### Cached RAG
 
 Identical architecture to A. Anthropic prompt caching enabled on the system prompt and stable retrieved chunks. The caching is internal to AI Engineering's consumption — Support Content's tool is unchanged.
 
 **What changes:** AI Engineering's per-request cost drops dramatically (up to 90% on cached prefixes). The architecture's inter-team boundaries don't change.
 
-**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running A in production today have caching enabled. Comparing A without caching to anything else overstates A's real cost.
+**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running Naive RAG in production today have caching enabled. Comparing A without caching to anything else overstates A's real cost.
 
-### Architecture C — Grep
+### Grep search
 
 ```mermaid
 flowchart LR
@@ -114,11 +114,11 @@ flowchart LR
 
 **Inter-team interface:** Support Content publishes a grep endpoint; AI Engineering's agent calls `grep_corpus(keywords, max_results=10)`.
 
-**Operational requirements for Support Content:** Lower than A. No vector store to maintain. No embedding model lifecycle. The corpus is served as text; the search is keyword-based.
+**Operational requirements for Support Content:** Lower than Naive RAG. No vector store to maintain. No embedding model lifecycle. The corpus is served as text; the search is keyword-based.
 
 **Trade-off:** The agent has to pick the right keywords. The bet of this architecture is that LLMs are good enough at keyword extraction that semantic retrieval isn't necessary for many tasks.
 
-### Architecture E — Hybrid RAG
+### Hybrid RAG
 
 The pattern mature production teams converge on.
 
@@ -152,11 +152,11 @@ flowchart LR
 
 See `ARCHITECTURE_RATIONALE.md` for full discussion of why these are deferred to v2 rather than dropped.
 
-- **Architecture B — Bounded structured tools.** One tool per policy class. Deferred because conceptually close to E with curated chunks.
-- **Architecture D — Full corpus stuffed.** No retrieval. Deferred because SolDevelo's published finding makes the qualitative point.
-- **Architecture F — Fine-tuned model.** Different cost structure. Mentioned in article only.
-- **Architecture H — Deterministic routing.** Different engineering effort. Mentioned in article only.
-- **Architecture I — No LLM at all.** Rhetorical baseline. Mentioned in article only.
+- **Bounded tools.** One tool per policy class. Deferred because conceptually close to Hybrid RAG with curated chunks.
+- **Stuffed corpus.** No retrieval. Deferred because SolDevelo's published finding makes the qualitative point.
+- **Fine-tuned.** Different cost structure. Mentioned in article only.
+- **Deterministic routing — Deterministic routing.** Different engineering effort. Mentioned in article only.
+- **No-LLM.** Rhetorical baseline. Mentioned in article only.
 
 ---
 
@@ -166,16 +166,16 @@ See `ARCHITECTURE_RATIONALE.md` for full discussion of why these are deferred to
 
 ### Summary across all task classes
 
-| Architecture       | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
-|--------------------|--------------------------|------------------|------------------|--------------|--------------|
-| A — Naive RAG      | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| A+G — A w/ cache   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| C — Grep           | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| E — Hybrid RAG     | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Architecture | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
+|--------------|--------------------------|------------------|------------------|--------------|--------------|
+| Naive RAG    | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Cached RAG   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Grep search  | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Hybrid RAG   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
 
 ### Per-class breakdown
 
-The interesting question is whether different architectures suit different task classes. If one architecture is uniformly best, the choice is straightforward. If A+G wins on cost but loses on edge cases, or C wins on simple queries but fails on mixed ones, the right answer depends on production traffic shape.
+The interesting question is whether different architectures suit different task classes. If one architecture is uniformly best, the choice is straightforward. If Cached RAG wins on cost but loses on edge cases, or C wins on simple queries but fails on mixed ones, the right answer depends on production traffic shape.
 
 > _Per-class tables to be populated._
 
@@ -183,13 +183,13 @@ The interesting question is whether different architectures suit different task 
 
 ## 7. Risks and open questions
 
-1. **Cache invalidation in A+G.** Prompt caching depends on stable prefixes. Any change to the system prompt or to retrieved chunk ordering breaks the cache. Document the conditions under which A+G's cost advantage holds vs. evaporates.
-2. **Grep result quality in C.** Grep's success depends on the LLM picking the right keywords. Document the failure modes — when does grep return nothing relevant, and how does the agent recover?
+1. **Cache invalidation in Cached RAG.** Prompt caching depends on stable prefixes. Any change to the system prompt or to retrieved chunk ordering breaks the cache. Document the conditions under which Cached RAG's cost advantage holds vs. evaporates.
+2. **Grep result quality in Grep search.** Grep's success depends on the LLM picking the right keywords. Document the failure modes — when does grep return nothing relevant, and how does the agent recover?
 3. **Audit trail equivalence.** Each architecture's audit trail looks different. Compliance review needed to confirm all four meet requirements.
 4. **Policy taxonomy completeness.** All measured architectures handle the existing FAQ corpus. New policy categories require:
-   - A and E: re-indexing (owned by Support Content)
-   - A+G: same as A, plus cache invalidation
-   - C: no action needed (grep always sees current corpus)
+   - Naive RAG and Hybrid RAG: re-indexing (owned by Support Content)
+   - Cached RAG: same as Naive RAG, plus cache invalidation
+   - Grep search: no action needed (grep always sees current corpus)
 5. **Quality drift over time.** Not assessed in v1 (single measurement, no longitudinal study).
 
 ---

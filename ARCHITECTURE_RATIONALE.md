@@ -15,7 +15,7 @@ An architecture earns measurement if it surfaces a misconception, represents a r
 
 ## Architectures included in v1
 
-### Architecture A — Naive RAG
+### Naive RAG
 
 Vector store, top-K=4 retrieval, LLM agent with tool calls.
 
@@ -28,20 +28,20 @@ Vector store, top-K=4 retrieval, LLM agent with tool calls.
 
 **Article angle:** "This is what you're paying for if you let your team build straight from tutorials."
 
-### Architecture A+G — A with prompt caching
+### Cached RAG
 
-Same as A. Anthropic prompt caching enabled on system prompt and stable retrieved chunks.
+Same as Naive RAG. Anthropic prompt caching enabled on system prompt and stable retrieved chunks.
 
 - **Popular?** Increasingly. Anthropic's 90% caching discount is now well-known.
 - **Misconception?** That caching is a separate optimization layer added later. It's actually a property of prompt architecture — stable prefixes matter.
 - **Industry standard?** For teams aware of it, yes. Many teams aren't aware.
-- **Our assumption?** That measuring A *without* caching gives a fair view of its real production cost. It doesn't — comparing A-without-caching to anything else overstates A's cost relative to what production teams actually pay.
+- **Our assumption?** That measuring Naive RAG *without* caching gives a fair view of its real production cost. It doesn't — comparing Naive-RAG-without-caching to anything else overstates A's cost relative to what production teams actually pay.
 
-**Why measure it:** Without this baseline, the comparison is unfair to RAG. The result we expect — that caching collapses A's cost dramatically — needs to be the published number, not an asterisk.
+**Why measure it:** Without this baseline, the comparison is unfair to RAG. The result we expect — that caching collapses Naive RAG's cost dramatically — needs to be the published number, not an asterisk.
 
 **Article angle:** "Before deciding RAG is expensive, check whether you've enabled prompt caching. It collapses the cost more than any architectural change."
 
-### Architecture C — Grep / keyword search
+### Grep search
 
 A `grep`-style search tool (case-insensitive, with reasonable result truncation) exposed by Support Content. The LLM agent picks keywords and calls the tool; grep returns matching lines with context.
 
@@ -54,54 +54,54 @@ A `grep`-style search tool (case-insensitive, with reasonable result truncation)
 
 **Article angle:** "Your platform team is building a vector store for a problem grep would solve. Before accepting the vector store as a given, can you justify it against a grep baseline?"
 
-### Architecture E — Hybrid RAG
+### Hybrid RAG
 
 Vector search + BM25 keyword search combined, with a reranking pass on the merged results.
 
 - **Popular?** Among teams that have iterated past v1, yes.
-- **Misconception?** That naive RAG (A) and production RAG (E) are the same thing.
+- **Misconception?** That Naive RAG and production RAG (Hybrid RAG) are the same thing.
 - **Industry standard?** Yes — this is what mature production RAG looks like in 2026.
-- **Our assumption?** That comparing alternatives against naive RAG (A) is fair. It isn't, for teams who have moved past v1.
+- **Our assumption?** That comparing alternatives against Naive RAG is fair. It isn't, for teams who have moved past v1.
 
-**Why measure it:** Without E in the comparison, a sharp reader dismisses the article with "you compared against a strawman." E is the actual standard the alternatives have to beat.
+**Why measure it:** Without Hybrid RAG in the comparison, a sharp reader dismisses the article with "you compared against a strawman." Hybrid RAG is the actual standard the alternatives have to beat.
 
 **Article angle:** "This is the real benchmark. Alternatives have to beat this, not the tutorial."
 
 ## Architectures deferred to v2
 
-### Architecture B — Bounded structured tools
+### Bounded tools
 
 One tool per policy class. Curated text returned from each tool.
 
 - **Why considered:** Tests the assumption that semantic retrieval is necessary when the policy taxonomy is closed.
-- **Why deferred:** Conceptually close enough to E (hybrid RAG over a small, well-tagged corpus) that the distinct measurement value is unclear. The interesting question — "is your taxonomy closed enough to skip semantic retrieval?" — gets partially answered by comparing E against C.
-- **When to add:** v2, if reviewers push back that B and E are meaningfully different in cost or success rate.
+- **Why deferred:** Conceptually close enough to E (hybrid RAG over a small, well-tagged corpus) that the distinct measurement value is unclear. The interesting question — "is your taxonomy closed enough to skip semantic retrieval?" — gets partially answered by comparing Hybrid RAG against Grep search.
+- **When to add:** v2, if reviewers push back thatBounded tools and Hybrid RAGare meaningfully different in cost or success rate.
 
-### Architecture D — Full corpus stuffed, no retrieval
+### Stuffed corpus
 
 The entire FAQ corpus pasted into the system prompt. No retrieval logic.
 
 - **Why considered:** SolDevelo's published finding suggests this sometimes beats RAG on TCO for small corpora.
 - **Why deferred:** It's more of a sanity check than a real architectural choice. The qualitative point can be made in the article by citing SolDevelo directly without re-measuring.
-- **When to add:** v2, if the v1 results suggest A and E are paying a lot for retrieval that the corpus size doesn't justify.
+- **When to add:** v2, if the v1 results suggest Naive RAG and Hybrid RAG are paying a lot for retrieval that the corpus size doesn't justify.
 
 ## Architectures mentioned in article but not measured
 
-### Architecture F — Fine-tuned model, no retrieval
+### Fine-tuned
 
 Train a smaller model on the policy corpus. Inference does not require retrieval.
 
 - **Why not measured:** Different cost structure (training cost upfront, inference cost down). Requires training infrastructure outside this experiment's scope.
 - **Article treatment:** Named as an alternative with its own cost profile. Useful for stable, well-bounded domains. Not directly comparable to runtime-retrieval architectures.
 
-### Architecture H — Deterministic routing + targeted lookup
+### Deterministic routing
 
 Classify the user question first (cheap model or rule-based router), then route to a deterministic SQL/file lookup with no LLM in the retrieval path, then format the response with the LLM. LLM at the edges, not in the middle.
 
 - **Why not measured:** Different engineering effort (classifier or rule system). Closer to "traditional software with LLM glue" than to "AI architecture."
 - **Article treatment:** Named as the pattern mature systems converge on for high-volume predictable queries. Reinforces the article's "do you need an LLM in the middle" point.
 
-### Architecture I — No LLM at all
+### No-LLM
 
 Structured query, structured response. Just software.
 
