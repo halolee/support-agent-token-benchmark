@@ -157,7 +157,7 @@ For each headline finding, articulate what would have to be true for it to rever
 
 **If Grep search is cheapest but loses on success rate:** Document the cost/competence frontier explicitly: _TBD_
 
-**If E wins overall:** Under what conditions would naive Naive RAG or grep C be preferable?
+**If Hybrid RAG wins overall:** Under what conditions would Naive RAG or Grep search be preferable?
 - Smaller corpus: _TBD_
 - Simpler queries: _TBD_
 - Different cost sensitivities: _TBD_

@@ -88,7 +88,7 @@ Identical architecture to A. Anthropic prompt caching enabled on the system prom
 
 **What changes:** AI Engineering's per-request cost drops dramatically (up to 90% on cached prefixes). The architecture's inter-team boundaries don't change.
 
-**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running Naive RAG in production today have caching enabled. Comparing A without caching to anything else overstates A's real cost.
+**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running Naive RAG in production today have caching enabled. Comparing Naive RAG without caching to anything else overstates Naive RAG's real cost.
 
 ### Grep search
 
@@ -175,7 +175,7 @@ See `ARCHITECTURE_RATIONALE.md` for full discussion of why these are deferred to
 
 ### Per-class breakdown
 
-The interesting question is whether different architectures suit different task classes. If one architecture is uniformly best, the choice is straightforward. If Cached RAG wins on cost but loses on edge cases, or C wins on simple queries but fails on mixed ones, the right answer depends on production traffic shape.
+The interesting question is whether different architectures suit different task classes. If one architecture is uniformly best, the choice is straightforward. If Cached RAG wins on cost but loses on edge cases, or Grep search wins on simple queries but fails on mixed ones, the right answer depends on production traffic shape.
 
 > _Per-class tables to be populated._
 

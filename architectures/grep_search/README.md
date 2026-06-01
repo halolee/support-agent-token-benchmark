@@ -4,7 +4,7 @@ Keyword search exposed as a tool. The agent picks search terms; grep returns mat
 
 ## Why this architecture is in the comparison
 
-See `ARCHITECTURE_RATIONALE.md`. Brief: C is the contrarian heart of the experiment. The "MCP/RAG vs. CLI/grep" argument lives or dies on whether keyword search, wrapped as a tool the LLM calls, is actually competitive with semantic retrieval for this class of task.
+See `ARCHITECTURE_RATIONALE.md`. Brief: Grep search is the contrarian heart of the experiment. The "MCP/RAG vs. CLI/grep" argument lives or dies on whether keyword search, wrapped as a tool the LLM calls, is actually competitive with semantic retrieval for this class of task.
 
 The bet: LLMs are excellent at picking keywords. They don't need vector search to do that. For a corpus the size of a typical FAQ, a well-implemented grep tool may match or beat semantic retrieval on cost while providing comparable success rates.
 

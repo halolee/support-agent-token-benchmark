@@ -35,7 +35,7 @@ Same as Naive RAG. Anthropic prompt caching enabled on system prompt and stable 
 - **Popular?** Increasingly. Anthropic's 90% caching discount is now well-known.
 - **Misconception?** That caching is a separate optimization layer added later. It's actually a property of prompt architecture — stable prefixes matter.
 - **Industry standard?** For teams aware of it, yes. Many teams aren't aware.
-- **Our assumption?** That measuring Naive RAG *without* caching gives a fair view of its real production cost. It doesn't — comparing Naive-RAG-without-caching to anything else overstates A's cost relative to what production teams actually pay.
+- **Our assumption?** That measuring Naive RAG *without* caching gives a fair view of its real production cost. It doesn't — comparing Naive-RAG-without-caching to anything else overstates Naive RAG's cost relative to what production teams actually pay.
 
 **Why measure it:** Without this baseline, the comparison is unfair to RAG. The result we expect — that caching collapses Naive RAG's cost dramatically — needs to be the published number, not an asterisk.
 

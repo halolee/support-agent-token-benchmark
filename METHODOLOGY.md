@@ -266,7 +266,7 @@ The principle: a finding is publishable when I have honestly tried to make the *
 All architectures must have received their reasonable best showing. If Naive RAG is at default settings and Grep search is hand-tuned, the comparison is asymmetric in ways that don't reflect production reality.
 
 Specifically required to verify:
-- [ ] A's retrieval is tuned (top-K, chunk size, threshold) — not running with defaults that may be suboptimal for the corpus
+- [ ] Naive RAG's retrieval is tuned (top-K, chunk size, threshold) — not running with defaults that may be suboptimal for the corpus
 - [ ] Hybrid RAG's hybrid retrieval is tuned (vector vs. BM25 weighting, reranking model choice) — not running with defaults
 - [ ] Grep search's grep tool is implemented with reasonable polish (case-insensitive, result truncation) — not a strawman implementation
 - [ ] Cached RAG's caching configuration is set to maximize stable-prefix reuse, not just enabled with defaults
@@ -289,8 +289,8 @@ For each headline finding, articulate what would have to be true for the result 
 
 Specifically required to verify:
 - [ ] If Cached RAG wins on cost, document under what conditions it would lose (highly variable system prompts, cache eviction, low repeat-prefix rate)
-- [ ] If C wins on cost but loses on success rate, document the cost/competence frontier explicitly
-- [ ] If E wins overall, document what would have to be true for naive Naive RAG or grep C to be preferable (smaller corpus, simpler queries, different cost sensitivities)
+- [ ] If Grep search wins on cost but loses on success rate, document the cost/competence frontier explicitly
+- [ ] If Hybrid RAG wins overall, document what would have to be true for Naive RAG or Grep search to be preferable (smaller corpus, simpler queries, different cost sensitivities)
 - [ ] If success rates differ, document what failure modes drove the difference and whether they are addressable in each architecture
 
 These counterfactuals are the scope-of-validity boundaries of the result. They are part of the published finding, not an asterisk on it.

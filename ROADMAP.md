@@ -108,7 +108,7 @@ The shape: v1 measures cost and success on a static dataset. It doesn't measure 
 - Cached RAG needs cache invalidation + re-indexing
 - Grep search needs no code change if the corpus just grows; needs code change only if the policy taxonomy changes the *kind* of question to ask
 
-**Trigger condition:** if v1 results show C competitive on cost/success against Naive RAG and Hybrid RAG on the static dataset, the natural follow-up question is whether C's adaptation story holds when the corpus changes. Without this axis, v1 understates C's case if C is genuinely cheaper to evolve, and overstates C's case if C silently misses new policy categories.
+**Trigger condition:** if v1 results show C competitive on cost/success against Naive RAG and Hybrid RAG on the static dataset, the natural follow-up question is whether Grep search's adaptation story holds when the corpus changes. Without this axis, v1 understates Grep search's case if Grep search is genuinely cheaper to evolve, and overstates Grep search's case if Grep search silently misses new policy categories.
 
 **Estimated effort:** significant. Requires (a) a second corpus reflecting realistic policy expansion, (b) re-running the full task set, (c) potentially new tasks specifically targeting the new policy classes, (d) re-indexing/adaptation-cost instrumentation.
 

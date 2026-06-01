@@ -6,7 +6,7 @@ This implementation is intentionally faithful to the [LangGraph customer support
 
 ## Why this architecture is in the comparison
 
-See `ARCHITECTURE_RATIONALE.md`. Brief: A is the popular default and the source of most misconceptions about "RAG." It's what gets shipped at v1, what job postings describe, and the baseline every other architecture has to be compared against.
+See `ARCHITECTURE_RATIONALE.md`. Brief: Naive RAG is the popular default and the source of most misconceptions about "RAG." It's what gets shipped at v1, what job postings describe, and the baseline every other architecture has to be compared against.
 
 ## Files
 
