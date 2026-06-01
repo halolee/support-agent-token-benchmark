@@ -47,7 +47,7 @@ The interesting question is whether the architectures perform differently on dif
 | Grep search                  | _TBD_       | $_TBD_    | _TBD_%       |
 | Hybrid RAG                  | _TBD_       | $_TBD_    | _TBD_%       |
 
-**Observation:** _TBD — does the contrarian C architecture hold its own on the case where RAG is theoretically strongest?_
+**Observation:** _TBD — does the contrarian Grep search architecture hold its own on the case where RAG is theoretically strongest?_
 
 ### Pure transactional tasks
 
@@ -102,7 +102,7 @@ The architecture comparison lives in category ②. Categories ①, ③, ④ are 
 | Component                       | Naive RAG (mean) | Cached RAG (mean) | Grep search (mean) | Hybrid RAG (mean) | Notes |
 |---------------------------------|----------|------------|----------|----------|-------|
 | System prompt                   | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Should be comparable across architectures |
-| Retrieved/injected context      | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Naive RAG/E: vector chunks. C: grep matches |
+| Retrieved/injected context      | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Naive RAG / Hybrid RAG: vector chunks. Grep search: grep matches |
 | User message                    | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Identical across architectures |
 | Tool call overhead              | _TBD_    | _TBD_      | _TBD_    | _TBD_    | Tool schemas differ per architecture |
 | Cache reads (Cached RAG only)          | n/a      | _TBD_      | n/a      | n/a      | Negative cost contribution |
@@ -121,7 +121,7 @@ If CoV exceeds 10%, results are exploratory. Re-run with more samples.
 The Silicon Data piece reports a reference workload of 3,150 input + 400 output tokens per ticket. This corresponds to a particular naive RAG configuration (system prompt 500 + chunks 2,500 + user 150 + response 400).
 
 Our Naive RAG configuration: _TBD — compare to Silicon Data reference_
-Our Cached RAG: _TBD — measure of how much caching collapses A_
+Our Cached RAG: _TBD — measure of how much caching collapses Naive RAG_
 Our Hybrid RAG: _TBD — production-grade RAG vs. naive_
 Our Grep search: _TBD — non-semantic alternative_
 
@@ -155,7 +155,7 @@ For each headline finding, articulate what would have to be true for it to rever
 - Cache eviction at scale: _TBD_
 - Low repeat-prefix rate in production: _TBD_
 
-**If C is cheapest but loses on success rate:** Document the cost/competence frontier explicitly: _TBD_
+**If Grep search is cheapest but loses on success rate:** Document the cost/competence frontier explicitly: _TBD_
 
 **If E wins overall:** Under what conditions would naive Naive RAG or grep C be preferable?
 - Smaller corpus: _TBD_

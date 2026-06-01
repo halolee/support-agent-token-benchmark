@@ -37,7 +37,7 @@
 
 - [ ] 6.1 Run agent on 2-3 hand-written tasks; verify completion
 - [ ] 6.2 Verify token decomposition sums within 5% tolerance
-- [ ] 6.3 Output to `measurement/results/architecture_e.json` is well-formed JSON
+- [ ] 6.3 Output to `measurement/results/architecture_hybrid_rag.json` is well-formed JSON
 
 ## 7. "Done" criteria from architecture README
 

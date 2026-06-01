@@ -4,12 +4,12 @@
 
 Grep search is the contrarian heart of the experiment. Per `ARCHITECTURE_RATIONALE.md`, the "MCP/RAG vs CLI/grep" framing lives or dies on whether keyword search, wrapped as an LLM-callable tool, is actually competitive with semantic retrieval for this task class.
 
-The bet C tests: LLMs are excellent at picking keywords. They don't need vector search to do that part. For a corpus the size of a typical FAQ, a well-implemented grep tool may match or beat semantic retrieval on cost while providing comparable success rates.
+The bet Grep search tests: LLMs are excellent at picking keywords. They don't need vector search to do that part. For a corpus the size of a typical FAQ, a well-implemented grep tool may match or beat semantic retrieval on cost while providing comparable success rates.
 
 Three outcomes are publishable:
-- C wins on cost AND success → vector search is over-engineering for this task class
-- C wins on cost but loses on success → cost/competence frontier exists, position depends on use case
-- C loses on both → semantic retrieval does real work, the contrarian claim falsified
+- Grep search wins on cost AND success → vector search is over-engineering for this task class
+- Grep search wins on cost but loses on success → cost/competence frontier exists, position depends on use case
+- Grep search loses on both → semantic retrieval does real work, the contrarian claim falsified
 
 ## What changes
 

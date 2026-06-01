@@ -41,8 +41,8 @@ This is grep done thoughtfully — not raw `grep -i` from a shell, but the moral
 ### Tools
 
 - `grep_corpus(keywords: list[str], max_results: int = 10, context_lines: int = 2)` — Support Content's keyword retrieval
-- All Booking Systems tools (identical to A)
-- `audit_log` (identical to A)
+- All Booking Systems tools (identical to Naive RAG)
+- `audit_log` (identical to Naive RAG)
 
 All tool implementations use parameterized SQL queries; the grep tool's optional regex parameter is character-bounded (≤64 chars by default) to prevent ReDoS. Input validation is a code-quality requirement, addressed during Phase 2 implementation (see `openspec/changes/implement-architecture-c/tasks.md`).
 
@@ -57,9 +57,9 @@ Target ~300-400 tokens. The prompt can be tighter than Naive RAG's because there
 
 ## What "done" looks like
 
-- Successfully answers at least 2 of 3 pure-policy tasks (this is where C's success rate matters most — if grep can find the right policy, the comparison is fair)
+- Successfully answers at least 2 of 3 pure-policy tasks (this is where Grep search's success rate matters most — if grep can find the right policy, the comparison is fair)
 - Successfully answers at least 2 of 3 pure-transactional tasks
-- All token measurements logged to `measurement/results/architecture_c.json`
+- All token measurements logged to `measurement/results/architecture_grep_search.json`
 - Decomposition sums correctly
 
 ## Known limitations
@@ -70,4 +70,4 @@ Target ~300-400 tokens. The prompt can be tighter than Naive RAG's because there
 
 ## What this architecture demonstrates
 
-If C performs competitively on cost AND success rate, the article's contrarian claim is validated: vector search may be over-engineering for tasks where the LLM can pick keywords. If C performs competitively on cost but loses on success rate, the article's claim becomes more nuanced: there's a cost/competence frontier, and the right point depends on what you're willing to sacrifice. If C performs poorly on both, the article's claim is falsified — semantic retrieval is doing real work even for this class of task. All three outcomes are publishable findings.
+If Grep search performs competitively on cost AND success rate, the article's contrarian claim is validated: vector search may be over-engineering for tasks where the LLM can pick keywords. If Grep search performs competitively on cost but loses on success rate, the article's claim becomes more nuanced: there's a cost/competence frontier, and the right point depends on what you're willing to sacrifice. If Grep search performs poorly on both, the article's claim is falsified — semantic retrieval is doing real work even for this class of task. All three outcomes are publishable findings.

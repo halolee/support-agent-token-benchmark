@@ -45,20 +45,20 @@ Support Content's operational burden is highest with Hybrid RAG — they maintai
 ### Tools
 
 - `hybrid_search(query: str, k: int = 6)` — Support Content's retrieval interface
-- All Booking Systems tools (identical to A)
-- `audit_log` (identical to A)
+- All Booking Systems tools (identical to Naive RAG)
+- `audit_log` (identical to Naive RAG)
 
 All tool implementations use parameterized SQL queries; no string concatenation into database paths. Input validation is a code-quality requirement, addressed during Phase 2 implementation (see `openspec/changes/implement-architecture-e/tasks.md`).
 
 ### Prompts
 
-System prompt similar to A's (~500 tokens). The agent doesn't need to know about the hybrid retrieval internals — it just calls the search tool. The agent-facing API is the same as Naive RAG; only Support Content's implementation differs.
+System prompt similar to Naive RAG's (~500 tokens). The agent doesn't need to know about the hybrid retrieval internals — it just calls the search tool. The agent-facing API is the same as Naive RAG; only Support Content's implementation differs.
 
 ## What "done" looks like
 
 - Successfully answers at least 2 of 3 pure-policy tasks
 - Successfully answers at least 2 of 3 pure-transactional tasks
-- Token measurements logged to `measurement/results/architecture_e.json`
+- Token measurements logged to `measurement/results/architecture_hybrid_rag.json`
 - Decomposition sums correctly
 
 ## Known limitations
@@ -71,4 +71,4 @@ System prompt similar to A's (~500 tokens). The agent doesn't need to know about
 
 ## What this architecture demonstrates
 
-If E is the cheapest, the answer is "use mature RAG, not tutorial RAG." If Cached RAG (cached A) matches E on cost while losing slightly on quality, the answer is "cache before complicating." If C matches E on cost AND quality, the answer is "you may not need the complexity at all." E provides the floor for "what production-grade RAG actually costs," which is the load-bearing comparison the article needs.
+If Hybrid RAG is the cheapest, the answer is "use mature RAG, not tutorial RAG." If Cached RAG matches Hybrid RAG on cost while losing slightly on quality, the answer is "cache before complicating." If Grep search matches Hybrid RAG on cost AND quality, the answer is "you may not need the complexity at all." Hybrid RAG provides the floor for "what production-grade RAG actually costs," which is the load-bearing comparison the article needs.

@@ -28,7 +28,7 @@ The vector store, BM25 index, reranker model, and combination logic all live ins
 
 ## Adversarial review hooks
 
-Per METHODOLOGY's Check 1 (equal tuning effort), E has the most tuning surface of any v1 architecture:
+Per METHODOLOGY's Check 1 (equal tuning effort), Hybrid RAG has the most tuning surface of any v1 architecture:
 
 - Vector vs BM25 weighting in Reciprocal Rank Fusion (default: equal)
 - Reranker model choice (`cross-encoder/ms-marco-MiniLM-L-6-v2` chosen for being lightweight and CPU-friendly)

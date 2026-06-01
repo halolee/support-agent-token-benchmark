@@ -4,7 +4,7 @@
 
 Naive RAG is the v1 reference for the canonical tutorial RAG pattern most teams ship as their first deployment. Per `ARCHITECTURE_RATIONALE.md`, it serves as the baseline every other architecture in the comparison must beat to claim a win — the "popular default" the article compares the rest against.
 
-Without A landed and measured, no other architecture's headline number is interpretable.
+Without Naive RAG landed and measured, no other architecture's headline number is interpretable.
 
 ## What changes
 
@@ -21,7 +21,7 @@ Without A landed and measured, no other architecture's headline number is interp
 - **New persisted artifact:** `architectures/naive_rag/vector_store/` (gitignored)
 - **Modifies:** nothing existing
 - **Depends on:** `measurement/tokens.py` (Phase 1 deliverable) and `corpus/swiss_faq.md` (Phase 1 Step 0) being in place first
-- **Blocks:** Grep search and E can proceed in parallel, but `measurement/runner.py`'s full multi-architecture run depends on at least one architecture being complete
+- **Blocks:** Grep search and Hybrid RAG can proceed in parallel, but `measurement/runner.py`'s full multi-architecture run depends on at least one architecture being complete
 
 ## Modularity constraint compliance
 

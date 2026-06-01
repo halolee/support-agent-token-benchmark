@@ -24,7 +24,7 @@
 
 - [ ] 4.1 Run agent on 2-3 hand-written tasks; verify it completes end-to-end
 - [ ] 4.2 Verify token decomposition sums to API-reported `input_tokens` within 5% (per METHODOLOGY's tolerance)
-- [ ] 4.3 Output to `measurement/results/architecture_a.json` is well-formed JSON
+- [ ] 4.3 Output to `measurement/results/architecture_naive_rag.json` is well-formed JSON
 
 ## 5. "Done" criteria from architecture README
 

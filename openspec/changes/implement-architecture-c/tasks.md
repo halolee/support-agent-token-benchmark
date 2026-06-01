@@ -25,10 +25,10 @@
 
 - [ ] 4.1 Run agent on 2-3 hand-written tasks; verify completion
 - [ ] 4.2 Verify token decomposition sums within 5% tolerance
-- [ ] 4.3 Output to `measurement/results/architecture_c.json` is well-formed JSON
+- [ ] 4.3 Output to `measurement/results/architecture_grep_search.json` is well-formed JSON
 
 ## 5. "Done" criteria from architecture README
 
-- [ ] 5.1 Successfully answers ≥2 of 3 pure-policy tasks (this is where C's success rate matters most — if grep can find the right policy, the comparison is fair to all parties)
+- [ ] 5.1 Successfully answers ≥2 of 3 pure-policy tasks (this is where Grep search's success rate matters most — if grep can find the right policy, the comparison is fair to all parties)
 - [ ] 5.2 Successfully answers ≥2 of 3 pure-transactional tasks
 - [ ] 5.3 Token decomposition is correct (5% tolerance) on all full-run tasks

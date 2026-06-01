@@ -16,7 +16,7 @@ Three modes:
 
 Architectures register themselves into ARCHITECTURE_REGISTRY when their
 modules are imported. Phase 1 ships only the built-in smoke "architecture"
-(a single direct API call, not a real architecture); A/C/E register in
+(a single direct API call, not a real architecture); Naive RAG / Grep search / Hybrid RAG register in
 Phase 2 when their agent.py modules land.
 """
 from __future__ import annotations
