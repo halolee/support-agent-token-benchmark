@@ -1,27 +1,27 @@
-# Implement Architecture A — Naive RAG
+# Implement Naive RAG
 
 ## Why
 
-Architecture A is the v1 reference for the canonical tutorial RAG pattern most teams ship as their first deployment. Per `ARCHITECTURE_RATIONALE.md`, it serves as the baseline every other architecture in the comparison must beat to claim a win — the "popular default" the article compares the rest against.
+Naive RAG is the v1 reference for the canonical tutorial RAG pattern most teams ship as their first deployment. Per `ARCHITECTURE_RATIONALE.md`, it serves as the baseline every other architecture in the comparison must beat to claim a win — the "popular default" the article compares the rest against.
 
-Without A landed and measured, no other architecture's headline number is interpretable.
+Without Naive RAG landed and measured, no other architecture's headline number is interpretable.
 
 ## What changes
 
-- Set up vector store: chunk `corpus/swiss_faq.md` per the chunking strategy in `architectures/a_naive_rag/README.md`, embed with BGE-M3 (self-hosted), persist locally
+- Set up vector store: chunk `corpus/swiss_faq.md` per the chunking strategy in `architectures/naive_rag/README.md`, embed with BGE-M3 (self-hosted), persist locally
 - Implement Support Content's `vector_search(query, k)` tool — the inter-team interface
 - Reuse Booking Systems' transactional tools (`get_booking_status`, `search_flights`, `search_hotels`, `search_cars`) and Compliance's `audit_log` (uniform payload)
-- Implement agent loop in `architectures/a_naive_rag/agent.py` — receive message → call model with system prompt + tools → execute tool calls → feed results back → loop until no-tool-call response
+- Implement agent loop in `architectures/naive_rag/agent.py` — receive message → call model with system prompt + tools → execute tool calls → feed results back → loop until no-tool-call response
 - Instrument token counting at every model call (not just the final one)
 - Smoke-test with 2-3 hand-written queries before full measurement
 
 ## Impact
 
-- **New code:** `architectures/a_naive_rag/agent.py`, `tools.py`, `prompts.py`, `setup_vector_store.py`
-- **New persisted artifact:** `architectures/a_naive_rag/vector_store/` (gitignored)
+- **New code:** `architectures/naive_rag/agent.py`, `tools.py`, `prompts.py`, `setup_vector_store.py`
+- **New persisted artifact:** `architectures/naive_rag/vector_store/` (gitignored)
 - **Modifies:** nothing existing
 - **Depends on:** `measurement/tokens.py` (Phase 1 deliverable) and `corpus/swiss_faq.md` (Phase 1 Step 0) being in place first
-- **Blocks:** Architecture C and E can proceed in parallel, but `measurement/runner.py`'s full multi-architecture run depends on at least one architecture being complete
+- **Blocks:** Grep search and Hybrid RAG can proceed in parallel, but `measurement/runner.py`'s full multi-architecture run depends on at least one architecture being complete
 
 ## Modularity constraint compliance
 

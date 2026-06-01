@@ -16,7 +16,7 @@ Three modes:
 
 Architectures register themselves into ARCHITECTURE_REGISTRY when their
 modules are imported. Phase 1 ships only the built-in smoke "architecture"
-(a single direct API call, not a real architecture); A/C/E register in
+(a single direct API call, not a real architecture); Naive RAG / Grep search / Hybrid RAG register in
 Phase 2 when their agent.py modules land.
 """
 from __future__ import annotations
@@ -287,7 +287,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--architectures",
         type=str,
         default=None,
-        help="Comma-separated architecture names (e.g., a,c,e).",
+        help="Comma-separated architecture names (e.g., naive_rag,grep_search,hybrid_rag).",
     )
     parser.add_argument(
         "--tasks",
@@ -341,7 +341,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(
-        "Usage: runner.py --smoke | --report | --architectures a,c,e --tasks tasks.jsonl",
+        "Usage: runner.py --smoke | --report | --architectures naive_rag,grep_search,hybrid_rag --tasks tasks.jsonl",
         file=sys.stderr,
     )
     return 2

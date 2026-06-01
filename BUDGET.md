@@ -40,7 +40,7 @@ Small real-API runs on 2–3 task subsets per architecture to confirm the measur
 
 **Cassettes from Tier 2 become methodology-gate fixtures** used by all subsequent session-based verification (see `tests/cassette.py`). Record once, replay forever — the only ongoing cost is when fixtures need to be re-recorded (model version change, decomposition logic change).
 
-Tier 2 cost is small because each validation hits at most a few API calls per architecture, on 2-3 short tasks. Total across A, C, E: well under $3.
+Tier 2 cost is small because each validation hits at most a few API calls per architecture, on 2-3 short tasks. Total across Naive RAG, Grep search, Hybrid RAG: well under $3.
 
 ---
 
@@ -48,10 +48,10 @@ Tier 2 cost is small because each validation hits at most a few API calls per ar
 
 Full Phase 2 runs in incremental pattern:
 
-1. **Architecture A** — full task set × 3 runs. Inspect results.
-2. **Architecture C** — same pattern. Inspect.
-3. **Architecture E** — same pattern. Inspect.
-4. **Phase 3: A+G** — caching variant on top of A.
+1. **Naive RAG** — full task set × 3 runs. Inspect results.
+2. **Grep search** — same pattern. Inspect.
+3. **Hybrid RAG** — same pattern. Inspect.
+4. **Phase 3: Cached RAG** — caching variant on top of Naive RAG.
 5. **Judge scoring** — Claude Opus 4.7 against the per-task rubric.
 6. **Adversarial-review re-runs** if Check 1/2/3 (METHODOLOGY) reveals tuning asymmetry, task-set bias, or counterfactual gaps.
 
@@ -101,13 +101,13 @@ Update this table after each phase. Estimates and actuals together — large gap
 
 | Date | Phase / Tier | Architecture | Estimated | Actual | Cumulative T2+T3 | Notes |
 |------|--------------|--------------|-----------|--------|------------------|-------|
-| — | Tier 2 validation | A | $0.50 | _TBD_ | _TBD_ | First Tier 2 run; records methodology gate cassette |
-| — | Tier 2 validation | C | $0.50 | _TBD_ | _TBD_ | |
-| — | Tier 2 validation | E | $0.50 | _TBD_ | _TBD_ | |
-| — | Tier 3 measurement | A | $10 | _TBD_ | _TBD_ | Full task set × 3 runs |
-| — | Tier 3 measurement | C | $6 | _TBD_ | _TBD_ | Lower input tokens expected |
-| — | Tier 3 measurement | E | $12 | _TBD_ | _TBD_ | Highest input tokens expected (reranker overhead is local, not API) |
-| — | Tier 3 A+G | A+G | $2 | _TBD_ | _TBD_ | Caching discount expected to bring this down sharply |
+| — | Tier 2 validation | Naive RAG | $0.50 | _TBD_ | _TBD_ | First Tier 2 run; records methodology gate cassette |
+| — | Tier 2 validation | Grep search | $0.50 | _TBD_ | _TBD_ | |
+| — | Tier 2 validation | Hybrid RAG | $0.50 | _TBD_ | _TBD_ | |
+| — | Tier 3 measurement | Naive RAG | $10 | _TBD_ | _TBD_ | Full task set × 3 runs |
+| — | Tier 3 measurement | Grep search | $6 | _TBD_ | _TBD_ | Lower input tokens expected |
+| — | Tier 3 measurement | Hybrid RAG | $12 | _TBD_ | _TBD_ | Highest input tokens expected (reranker overhead is local, not API) |
+| — | Tier 3 Cached RAG | Cached RAG | $2 | _TBD_ | _TBD_ | Caching discount expected to bring this down sharply |
 | — | Tier 3 judge | (all) | $5 | _TBD_ | _TBD_ | Opus 4.7 scoring |
 | — | Tier 3 re-runs | _TBD_ | $0–10 | _TBD_ | _TBD_ | Triggered by adversarial review only |
 

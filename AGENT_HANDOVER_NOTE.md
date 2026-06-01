@@ -7,7 +7,7 @@ This document is the framing context for the implementation work. Read this **fi
 A measurement framework comparing **four retrieval architectures** for LLM-based customer support agents:
 
 - **A** — Naive RAG (vector top-K)
-- **A+G** — A with prompt caching enabled
+- **Cached RAG** — A with prompt caching enabled
 - **C** — Grep / keyword search
 - **E** — Hybrid RAG (vector + BM25 + reranking)
 
@@ -20,7 +20,7 @@ This is **not**:
 
 ## What changed from the previous version
 
-Earlier iterations of this project had two architectures (A and B). You correctly flagged that this didn't match the article framing. We expanded to four (A, A+G, C, E), deferred B and D to v2, and added several other corrections you caught:
+Earlier iterations of this project had only two architectures. You correctly flagged that this didn't match the article framing. We expanded to four (Naive RAG, Cached RAG, Grep search, Hybrid RAG), deferred Bounded tools and Stuffed corpus to v2, and added several other corrections you caught:
 
 - **Modularity constraint enforced** across all architectures (every cross-team data flow via explicit tool call, owned by the data-owning team) — this simulates enterprise org-chart conditions
 - **Model IDs fixed:** agent = `claude-sonnet-4-6`, judge = `claude-opus-4-7`
@@ -48,7 +48,7 @@ Suggested order:
 
 ## What you should do first
 
-**Phase 1, Step 0 in BUILD_PLAN:** explore the LangGraph customer support tutorial. Read what's actually there before designing anything. The corpus (`swiss_faq.md`) and database (`travel.sqlite`) need to be downloaded from there. Inventory what they contain — this affects implementation choices for A, C, and E.
+**Phase 1, Step 0 in BUILD_PLAN:** explore the LangGraph customer support tutorial. Read what's actually there before designing anything. The corpus (`swiss_faq.md`) and database (`travel.sqlite`) need to be downloaded from there. Inventory what they contain — this affects implementation choices for Naive RAG, Grep search, and Hybrid RAG.
 
 After Step 0, proceed through BUILD_PLAN phases sequentially. Each phase is independently shippable.
 
@@ -58,7 +58,7 @@ If during implementation you notice:
 
 1. **A misalignment between the docs and the article's framing** — flag it. The previous version had exactly this problem; catching it early is high value.
 2. **A measurement choice that would bias the comparison** — flag it. The adversarial review discipline depends on catching these before publication.
-3. **A scope addition that wasn't in v1 plan** — push back. "Cumulative scope creep" already happened once with this project; we shipped a tighter v1 specifically to demonstrate prioritization. Don't add B, D, F, H, I to v1 unless we explicitly discuss it.
+3. **A scope addition that wasn't in v1 plan** — push back. "Cumulative scope creep" already happened once with this project; we shipped a tighter v1 specifically to demonstrate prioritization. Don't add Bounded tools, Stuffed corpus, Fine-tuned, Deterministic routing, or No-LLM to v1 unless we explicitly discuss it.
 4. **A task phrasing that violates Check 2** — fix it. Tasks that map cleanly to category names (or to keyword-friendly vocabulary for grep) are the most common source of accidentally biased measurements.
 
 ## Distinguishing rigor from scope creep
@@ -75,7 +75,7 @@ If no — if the question is genuinely load-bearing for v1's headline claims and
 
 Examples of the distinction:
 
-- **Scope creep:** "We should measure caching for C and E too, in case a reader argues caching collapses the gap there." → This can be deferred. ROADMAP already lists it. The adversarial review covers the question.
+- **Scope creep:** "We should measure caching for Grep search and Hybrid RAG too, in case a reader argues caching collapses the gap there." → This can be deferred. ROADMAP already lists it. The adversarial review covers the question.
 - **Real rigor:** "Task POL-002 uses keyword vocabulary that gives grep a free signal. The phrasing needs to change before we measure anything." → This is a measurement bias that would invalidate the comparison. Cannot be deferred.
 
 The first kind expands scope. The second kind protects the scope already set. Easy to confuse; worth being explicit about.
@@ -85,8 +85,8 @@ The first kind expands scope. The second kind protects the scope already set. Ea
 For each phase:
 
 - **Phase 1 deliverable:** repo runs end-to-end with smoke test passing; token decomposition is correct
-- **Phase 2 deliverable:** three architectures measured (A, C, E), adversarial review complete, comparison report has real numbers
-- **Phase 3 deliverable:** A+G added, comparison report shows caching effect quantified
+- **Phase 2 deliverable:** three architectures measured (Naive RAG, Grep search, Hybrid RAG), adversarial review complete, comparison report has real numbers
+- **Phase 3 deliverable:** Cached RAG added, comparison report shows caching effect quantified
 - **Phase 4:** deferred (B, D) unless explicitly added
 
 The project ships as a portfolio artifact when Phases 1-2 complete with adversarial review done. Phase 3 strengthens it. Phase 4 is opt-in.

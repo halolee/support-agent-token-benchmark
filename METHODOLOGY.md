@@ -12,11 +12,11 @@ If you disagree with any choice below, the right move is to fork the methodology
 
 - **Agent model:** `claude-sonnet-4-6` (Sonnet 4.6 dateless ID; current mid-tier production default in 2026)
 - **Judge model:** `claude-opus-4-7` (Opus 4.7 dateless ID; current strongest model, used for LLM-as-judge scoring)
-- **Embedding model:** `BAAI/bge-m3` (MIT-licensed, self-hosted, the 2026 enterprise default for self-hosted RAG). Used by Architectures A, A+G, and E. This is a deliberate alignment with enterprise self-hosted practice rather than API-based embedding services. The choice eliminates data egress concerns that would arise from sending corpus content to third-party embedding APIs — a hard constraint in regulated industries and a soft constraint in most enterprise contexts. Retrieval quality is comparable to commercial APIs (text-embedding-3-large) on most public benchmarks.
+- **Embedding model:** `BAAI/bge-m3` (MIT-licensed, self-hosted, the 2026 enterprise default for self-hosted RAG). Used by Naive RAG, Cached RAG, and Hybrid RAG. This is a deliberate alignment with enterprise self-hosted practice rather than API-based embedding services. The choice eliminates data egress concerns that would arise from sending corpus content to third-party embedding APIs — a hard constraint in regulated industries and a soft constraint in most enterprise contexts. Retrieval quality is comparable to commercial APIs (text-embedding-3-large) on most public benchmarks.
 - **Temperature:** 0.0 (for reproducibility; production deployments would typically use 0.3–0.7)
 - **Max tokens:** 1024 (response cap)
 - **Tools:** Native Anthropic function calling
-- **Cache:** Disabled for Architectures A, C, E. Enabled for Architecture A+G (which exists specifically to measure the caching effect). Documented per-architecture.
+- **Cache:** Disabled for Naive RAG, Grep search, and Hybrid RAG. Enabled for Cached RAG (which exists specifically to measure the caching effect). Documented per-architecture.
 
 ### Model ID stability
 
@@ -31,7 +31,7 @@ The agent inference model is an API (Anthropic); the embedding model is self-hos
 - **Embedding** sees the full corpus during indexing and the user message at query time. Sending corpus content to a third-party API creates data egress exposure that conflicts with the enterprise framing this experiment targets. Self-hosted is the correct default for embedding.
 - **Inference** sees only the assembled prompt (system prompt + retrieved context + user message) at the moment of the call. The data exposure profile is narrower, and the cost-vs-quality tradeoff at this scale favors API-based inference.
 
-Architecture E's reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is also self-hosted, consistent with the embedding choice — the inter-team interface Support Content publishes runs entirely within a perimeter Support Content controls.
+Hybrid RAG's reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) is also self-hosted, consistent with the embedding choice — the inter-team interface Support Content publishes runs entirely within a perimeter Support Content controls.
 
 If a reader of the published article asks "why API for inference but self-hosted for embedding," the answer is: different data exposure profile, different cost-vs-quality tradeoff, different operational complexity. The framework supports both choices honestly.
 
@@ -55,7 +55,7 @@ The simulated organization has the following team boundaries:
 
 2. **No direct database access.** Same rule for `data/travel.sqlite`. The agent calls tools; the tools query the database.
 
-3. **No direct corpus mutation.** AI Engineering cannot pre-process or restructure the corpus to its preferred shape. If a transformation is needed (chunking for A, partitioning for B in v2), that transformation is owned by Support Content and exposed through whatever interface they publish.
+3. **No direct corpus mutation.** AI Engineering cannot pre-process or restructure the corpus to its preferred shape. If a transformation is needed (chunking for Naive RAG, partitioning for Bounded tools in v2), that transformation is owned by Support Content and exposed through whatever interface they publish.
 
 4. **Cross-team interfaces are explicit.** Every tool's input/output schema is part of the inter-team contract. Schema changes are inter-team negotiations, not silent updates.
 
@@ -111,10 +111,10 @@ Brief summary; full implementation specs in each architecture's README.
 
 | Architecture | Inter-team interface                                                        |
 |--------------|------------------------------------------------------------------------------|
-| A (Naive RAG)| Support Content exposes `vector_search(query, k)`; AI Engineering consumes  |
-| A+G          | Same as A; caching is internal to the consumer side                         |
-| C (Grep)     | Support Content exposes `grep_corpus(keywords)`; AI Engineering consumes    |
-| E (Hybrid)   | Support Content exposes `hybrid_search(query, k)`; AI Engineering consumes  |
+| Naive RAG    | Support Content exposes `vector_search(query, k)`; AI Engineering consumes  |
+| Cached RAG   | Same as Naive RAG; caching is internal to the consumer side                 |
+| Grep search  | Support Content exposes `grep_corpus(keywords)`; AI Engineering consumes    |
+| Hybrid RAG   | Support Content exposes `hybrid_search(query, k)`; AI Engineering consumes  |
 
 Booking-related tools (`get_booking_status`, etc.) are identical across all architectures — they're exposed by Booking Systems regardless of which retrieval architecture is used.
 
@@ -153,8 +153,8 @@ For each task run, the following are recorded from the API response:
 |--------------------------------|---------------------------------------------|
 | `input_tokens`                 | API usage object (provider-reported)        |
 | `output_tokens`                | API usage object (provider-reported)        |
-| `cache_creation_input_tokens`  | API usage object (zero for A/C/E, non-zero for A+G) |
-| `cache_read_input_tokens`      | API usage object (zero for A/C/E, non-zero for A+G) |
+| `cache_creation_input_tokens`  | API usage object (zero for Naive RAG / Grep search / Hybrid RAG, non-zero for Cached RAG) |
+| `cache_read_input_tokens`      | API usage object (zero for Naive RAG / Grep search / Hybrid RAG, non-zero for Cached RAG) |
 
 These raw numbers are then decomposed into five categories matching the [Silicon Data methodology](https://www.silicondata.com/blog/llm-cost-per-token):
 
@@ -175,10 +175,10 @@ The sum of categories 1–4 should approximately equal `input_tokens` reported b
 The following are deliberately excluded from per-task cost numbers:
 
 - **Vector store infrastructure cost.** Hosting, embedding storage, re-indexing on policy updates.
-- **Embedding compute.** Architectures A and E run BGE-M3 inference locally (CPU) for query embedding and during one-time corpus indexing. Cost is local CPU time, not API tokens. Excluded from per-task token decomposition; flagged in `comparison.md`.
+- **Embedding compute.** Architectures Naive RAG and Hybrid RAG run BGE-M3 inference locally (CPU) for query embedding and during one-time corpus indexing. Cost is local CPU time, not API tokens. Excluded from per-task token decomposition; flagged in `comparison.md`.
 - **Audit log API calls.** Every architecture writes to Compliance's `audit_log` tool. The audit payload is uniform across architectures (see "Audit log specification" below) so the token cost would be approximately identical across architectures. To avoid conflating retrieval cost with logging cost, audit_log calls are excluded from the per-task token decomposition entirely. Same pattern as embedding compute.
-- **Curation cost.** Some architectures benefit from upfront curation (B's policy partitioning, E's reranking model selection). Not measured.
-- **Development cost.** Building Architecture E took longer than Architecture A. Not captured.
+- **Curation cost.** Some architectures benefit from upfront curation (Bounded tools' policy partitioning, Hybrid RAG's reranking model selection). Not measured.
+- **Development cost.** Building Hybrid RAG took longer than Naive RAG. Not captured.
 - **Operational costs.** Monitoring, evaluation harnesses, on-call burden.
 
 The headline claim of this project is about *per-call inference token cost only*. Total cost of ownership is discussed qualitatively in `HANDOVER.md` and the companion article, but is not part of the measured comparison.
@@ -224,7 +224,7 @@ Task IDs are stable across runs. New tasks get new IDs. Edits create a new ID an
 
 ## Run protocol
 
-1. All architectures execute the full task set in a single run, alternating architectures per task (A, A+G, C, E, A, A+G, ...) to control for time-of-day API latency variance.
+1. All architectures execute the full task set in a single run, alternating architectures per task (Naive RAG, Cached RAG, Grep search, Hybrid RAG, Naive RAG, Cached RAG, ...) to control for time-of-day API latency variance.
 2. Each task is run **three times** per architecture. The reported value is the median of the three runs. Variance is reported in `comparison.md`.
 3. If any run produces an API error, that run is retried up to twice. If it still fails, the task is flagged and excluded from that run's reported numbers.
 
@@ -237,7 +237,7 @@ git clone <repo>
 cd support-agent-token-benchmark
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
-python measurement/runner.py --architectures a,a_cached,c,e --tasks measurement/tasks.jsonl --runs 3
+python measurement/runner.py --architectures naive_rag,cached_rag,grep_search,hybrid_rag --tasks measurement/tasks.jsonl --runs 3
 python measurement/runner.py --report
 ```
 
@@ -263,13 +263,13 @@ The principle: a finding is publishable when I have honestly tried to make the *
 
 **Check 1 — Equal tuning effort.**
 
-All architectures must have received their reasonable best showing. If A is at default settings and C is hand-tuned, the comparison is asymmetric in ways that don't reflect production reality.
+All architectures must have received their reasonable best showing. If Naive RAG is at default settings and Grep search is hand-tuned, the comparison is asymmetric in ways that don't reflect production reality.
 
 Specifically required to verify:
-- [ ] A's retrieval is tuned (top-K, chunk size, threshold) — not running with defaults that may be suboptimal for the corpus
-- [ ] E's hybrid retrieval is tuned (vector vs. BM25 weighting, reranking model choice) — not running with defaults
-- [ ] C's grep tool is implemented with reasonable polish (case-insensitive, result truncation) — not a strawman implementation
-- [ ] A+G's caching configuration is set to maximize stable-prefix reuse, not just enabled with defaults
+- [ ] Naive RAG's retrieval is tuned (top-K, chunk size, threshold) — not running with defaults that may be suboptimal for the corpus
+- [ ] Hybrid RAG's hybrid retrieval is tuned (vector vs. BM25 weighting, reranking model choice) — not running with defaults
+- [ ] Grep search's grep tool is implemented with reasonable polish (case-insensitive, result truncation) — not a strawman implementation
+- [ ] Cached RAG's caching configuration is set to maximize stable-prefix reuse, not just enabled with defaults
 - [ ] All architectures share an equivalently-tuned system prompt baseline (no architecture penalized by bloated prompt)
 - [ ] Document the effort asymmetry honestly if one cannot be removed
 
@@ -288,9 +288,9 @@ Specifically required to verify:
 For each headline finding, articulate what would have to be true for the result to reverse.
 
 Specifically required to verify:
-- [ ] If A+G wins on cost, document under what conditions it would lose (highly variable system prompts, cache eviction, low repeat-prefix rate)
-- [ ] If C wins on cost but loses on success rate, document the cost/competence frontier explicitly
-- [ ] If E wins overall, document what would have to be true for naive A or grep C to be preferable (smaller corpus, simpler queries, different cost sensitivities)
+- [ ] If Cached RAG wins on cost, document under what conditions it would lose (highly variable system prompts, cache eviction, low repeat-prefix rate)
+- [ ] If Grep search wins on cost but loses on success rate, document the cost/competence frontier explicitly
+- [ ] If Hybrid RAG wins overall, document what would have to be true for Naive RAG or Grep search to be preferable (smaller corpus, simpler queries, different cost sensitivities)
 - [ ] If success rates differ, document what failure modes drove the difference and whether they are addressable in each architecture
 
 These counterfactuals are the scope-of-validity boundaries of the result. They are part of the published finding, not an asterisk on it.

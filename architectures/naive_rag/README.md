@@ -1,4 +1,4 @@
-# Architecture A — Naive RAG
+# Naive RAG
 
 The canonical tutorial pattern. Vector store, top-K retrieval, LLM agent with tool calls.
 
@@ -6,7 +6,7 @@ This implementation is intentionally faithful to the [LangGraph customer support
 
 ## Why this architecture is in the comparison
 
-See `ARCHITECTURE_RATIONALE.md`. Brief: A is the popular default and the source of most misconceptions about "RAG." It's what gets shipped at v1, what job postings describe, and the baseline every other architecture has to be compared against.
+See `ARCHITECTURE_RATIONALE.md`. Brief: Naive RAG is the popular default and the source of most misconceptions about "RAG." It's what gets shipped at v1, what job postings describe, and the baseline every other architecture has to be compared against.
 
 ## Files
 
@@ -33,7 +33,7 @@ The vector store itself (`vector_store/` directory) is conceptually owned by Sup
 
 - **Embedding model:** `BAAI/bge-m3` (self-hosted, MIT-licensed) — the 2026 enterprise self-hosted default. See METHODOLOGY §"Model and configuration" for the reasoning behind self-hosted over API-based embedding
 - **Chunking strategy:** Split FAQ corpus on H2 (`##`) headings, then further split chunks above 500 tokens at paragraph boundaries. Targets ~300-500 tokens per chunk
-- **Top-K:** 4. Lower end of common defaults (4-8) to give A a fair shot — over-retrieval is a known waste pattern. Adversarial review verifies this is tuned, not just defaulted
+- **Top-K:** 4. Lower end of common defaults (4-8) to give Naive RAG a fair shot — over-retrieval is a known waste pattern. Adversarial review verifies this is tuned, not just defaulted
 - **Retrieval threshold:** None in v1 (always return K chunks). Documented limitation
 
 ### Tools
@@ -56,7 +56,7 @@ Avoid few-shot examples in system prompt (inflates tokens) and repeated boilerpl
 
 - Successfully answers at least 2 of 3 pure-policy tasks
 - Successfully answers at least 2 of 3 pure-transactional tasks
-- All token measurements logged to `measurement/results/architecture_a.json`
+- All token measurements logged to `measurement/results/architecture_naive_rag.json`
 - Decomposition sums to total tokens reported by API (within 5%)
 
 ## Known limitations

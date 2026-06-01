@@ -42,8 +42,8 @@ class TestParseArgs:
     def test_architectures_passed_as_csv_string(self):
         from measurement.runner import parse_args
 
-        args = parse_args(["--architectures", "a,c,e"])
-        assert args.architectures == "a,c,e"
+        args = parse_args(["--architectures", "naive_rag,grep_search,hybrid_rag"])
+        assert args.architectures == "naive_rag,grep_search,hybrid_rag"
 
     def test_runs_defaults_to_3(self):
         from measurement.runner import parse_args
@@ -192,7 +192,7 @@ class TestReport:
 
         # Fabricate a couple of fixture result files
         result_a = {
-            "architecture": "a",
+            "architecture": "naive_rag",
             "runs": [
                 {
                     "task_id": "POL-001",
@@ -208,15 +208,15 @@ class TestReport:
                 }
             ],
         }
-        (tmp_path / "architecture_a.json").write_text(json.dumps(result_a))
+        (tmp_path / "architecture_naive_rag.json").write_text(json.dumps(result_a))
 
         output_path = tmp_path / "comparison.md"
         exit_code = generate_report(results_dir=tmp_path, output_path=output_path)
         assert exit_code == 0
         assert output_path.exists()
         content = output_path.read_text()
-        # Architecture A's mean tokens should appear in the output
-        assert "Architecture A" in content or "a" in content.lower()
+        # Naive RAG's mean tokens should appear in the output
+        assert "naive_rag" in content.lower()
 
 
 # =========================================================================

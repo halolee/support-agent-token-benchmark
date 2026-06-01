@@ -1,10 +1,10 @@
-# Architecture C — Grep
+# Grep search
 
 Keyword search exposed as a tool. The agent picks search terms; grep returns matching lines with context.
 
 ## Why this architecture is in the comparison
 
-See `ARCHITECTURE_RATIONALE.md`. Brief: C is the contrarian heart of the experiment. The "MCP/RAG vs. CLI/grep" argument lives or dies on whether keyword search, wrapped as a tool the LLM calls, is actually competitive with semantic retrieval for this class of task.
+See `ARCHITECTURE_RATIONALE.md`. Brief: Grep search is the contrarian heart of the experiment. The "MCP/RAG vs. CLI/grep" argument lives or dies on whether keyword search, wrapped as a tool the LLM calls, is actually competitive with semantic retrieval for this class of task.
 
 The bet: LLMs are excellent at picking keywords. They don't need vector search to do that. For a corpus the size of a typical FAQ, a well-implemented grep tool may match or beat semantic retrieval on cost while providing comparable success rates.
 
@@ -18,11 +18,11 @@ The bet: LLMs are excellent at picking keywords. They don't need vector search t
 
 ## Modularity constraint compliance
 
-Per METHODOLOGY, all architectures respect simulated team boundaries. This matters especially for C because naive "grep" implies file system access, which would violate the boundary.
+Per METHODOLOGY, all architectures respect simulated team boundaries. This matters especially for Grep search because naive "grep" implies file system access, which would violate the boundary.
 
 - **Support Content's interface:** `grep_corpus(keywords: list[str], max_results: int = 10) -> list[Match]`. Implemented as a tool exposed by Support Content. AI Engineering's agent does NOT shell out to grep directly on the corpus file — it calls the tool, which performs the search inside Support Content's owned code path.
-- **Booking Systems' interface:** Identical to Architecture A
-- **Compliance interface:** Identical to Architecture A
+- **Booking Systems' interface:** Identical to Naive RAG
+- **Compliance interface:** Identical to Naive RAG
 
 The grep tool is structured to feel like grep — case-insensitive substring matching, returns matching lines with N lines of context, truncates results — but it's exposed as a structured tool with a defined contract, not as raw shell access.
 
@@ -41,8 +41,8 @@ This is grep done thoughtfully — not raw `grep -i` from a shell, but the moral
 ### Tools
 
 - `grep_corpus(keywords: list[str], max_results: int = 10, context_lines: int = 2)` — Support Content's keyword retrieval
-- All Booking Systems tools (identical to A)
-- `audit_log` (identical to A)
+- All Booking Systems tools (identical to Naive RAG)
+- `audit_log` (identical to Naive RAG)
 
 All tool implementations use parameterized SQL queries; the grep tool's optional regex parameter is character-bounded (≤64 chars by default) to prevent ReDoS. Input validation is a code-quality requirement, addressed during Phase 2 implementation (see `openspec/changes/implement-architecture-c/tasks.md`).
 
@@ -53,13 +53,13 @@ System prompt should:
 - Encourage iterative search if first attempt returns too few or irrelevant results
 - Explain how to interpret grep results (matching lines with context, not full document sections)
 
-Target ~300-400 tokens. The prompt can be tighter than A's because there's less retrieval orchestration to explain.
+Target ~300-400 tokens. The prompt can be tighter than Naive RAG's because there's less retrieval orchestration to explain.
 
 ## What "done" looks like
 
-- Successfully answers at least 2 of 3 pure-policy tasks (this is where C's success rate matters most — if grep can find the right policy, the comparison is fair)
+- Successfully answers at least 2 of 3 pure-policy tasks (this is where Grep search's success rate matters most — if grep can find the right policy, the comparison is fair)
 - Successfully answers at least 2 of 3 pure-transactional tasks
-- All token measurements logged to `measurement/results/architecture_c.json`
+- All token measurements logged to `measurement/results/architecture_grep_search.json`
 - Decomposition sums correctly
 
 ## Known limitations
@@ -70,4 +70,4 @@ Target ~300-400 tokens. The prompt can be tighter than A's because there's less 
 
 ## What this architecture demonstrates
 
-If C performs competitively on cost AND success rate, the article's contrarian claim is validated: vector search may be over-engineering for tasks where the LLM can pick keywords. If C performs competitively on cost but loses on success rate, the article's claim becomes more nuanced: there's a cost/competence frontier, and the right point depends on what you're willing to sacrifice. If C performs poorly on both, the article's claim is falsified — semantic retrieval is doing real work even for this class of task. All three outcomes are publishable findings.
+If Grep search performs competitively on cost AND success rate, the article's contrarian claim is validated: vector search may be over-engineering for tasks where the LLM can pick keywords. If Grep search performs competitively on cost but loses on success rate, the article's claim becomes more nuanced: there's a cost/competence frontier, and the right point depends on what you're willing to sacrifice. If Grep search performs poorly on both, the article's claim is falsified — semantic retrieval is doing real work even for this class of task. All three outcomes are publishable findings.

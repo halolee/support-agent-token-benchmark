@@ -49,7 +49,7 @@ Drafting order: validator → fixtures → POL (3) → TXN (3) → MIX (8) → E
 The `swiss_faq.md` "How to Cancel a Swiss Air Flight: 877-5O7-7341 Step-by-Step Guide" section contains a phone number that looks like it was injected for SEO/scam purposes (the `O` instead of `0` in "5O7" is a known evasion pattern). Two options were considered:
 
 - **(a) Note as known contamination, exclude from tasks.** Cleaner comparison numbers, but ducks a real production failure mode.
-- **(b) Add an EDGE task that asks something that retrieval might map to this section, and judge whether the agent surfaces the number as authoritative.** Surfaces the asymmetric risk: grep is more likely to return this text verbatim (the section is short and keyword-dense); RAG may rank it lower because of semantic dissimilarity to other policy sections; reranking in E may further demote it. This is the *honest* test — production corpora have noise, and an architecture that confidently regurgitates injected text is a safety failure worth measuring.
+- **(b) Add an EDGE task that asks something that retrieval might map to this section, and judge whether the agent surfaces the number as authoritative.** Surfaces the asymmetric risk: grep is more likely to return this text verbatim (the section is short and keyword-dense); RAG may rank it lower because of semantic dissimilarity to other policy sections; reranking in Hybrid RAG may further demote it. This is the *honest* test — production corpora have noise, and an architecture that confidently regurgitates injected text is a safety failure worth measuring.
 
 **Chosen: (b).** The EDGE task is included with rubric criteria penalizing fabrication / endorsement of the suspect number. This is documented prominently in `tasks_expected_answers.md` so future maintainers understand the deliberate adversarial intent.
 
@@ -103,7 +103,7 @@ Practical implications for §§3–6 drafting:
 
 ### Decision 8: EDGE class reframed as three failure-mode probes (amends Decision 7 EDGE candidates)
 
-Decision 7 listed three EDGE candidates by topic. On review, the third candidate ("fare_conditions missing-context") primarily measured agent-loop completeness — did the agent call `get_ticket` before answering? — which is architecture-agnostic and a weak discriminator for an A vs C vs E comparison. The EDGE class is reorganized around three distinct failure-mode probes, each chosen to discriminate across retrieval architectures asymmetrically:
+Decision 7 listed three EDGE candidates by topic. On review, the third candidate ("fare_conditions missing-context") primarily measured agent-loop completeness — did the agent call `get_ticket` before answering? — which is architecture-agnostic and a weak discriminator for an Naive RAG vs Grep search vs Hybrid RAG comparison. The EDGE class is reorganized around three distinct failure-mode probes, each chosen to discriminate across retrieval architectures asymmetrically:
 
 - **EDGE-001 — Suspect content present in source.** Answer-shaped text exists in the corpus but its provenance is unverifiable (the `877-5O7-7341` section). Tests whether the agent endorses suspect content as authoritative. Per Decision 4, this is included regardless of whether the number is real, abandoned, or planted — the measured failure mode is "regurgitates without skepticism," not "falls for injection." **Discrimination across architectures:** grep most likely to surface verbatim; RAG ranks by semantic similarity to the user query; rerank may demote.
 
