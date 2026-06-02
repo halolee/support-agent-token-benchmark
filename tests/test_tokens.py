@@ -2,7 +2,7 @@
 
 The spec for the token decomposition primitives:
 - count_tokens         — wraps Anthropic's beta count_tokens API
-- decompose_request    — produces the 5-category Silicon Data breakdown
+- decompose_request    — produces the 6-category breakdown (Silicon Data 5 + agent_intermediate)
 - record_run           — structured logging record per task-run
 
 Unit tests use a mocked Anthropic client.
@@ -61,7 +61,7 @@ class TestCountTokens:
 
 
 class TestDecomposeRequest:
-    def test_returns_five_categories(self):
+    def test_returns_six_categories(self):
         from measurement.tokens import decompose_request
 
         client = MagicMock()
@@ -78,6 +78,7 @@ class TestDecomposeRequest:
             "retrieved_context",
             "user_message",
             "tool_overhead",
+            "agent_intermediate",
             "response",
         }
         assert set(result.keys()) == expected
@@ -170,6 +171,68 @@ class TestDecomposeRequest:
         assert result["user_message"] == 0
         assert result["retrieved_context"] == 0
         assert result["tool_overhead"] == 0
+        assert result["agent_intermediate"] == 0
+
+    def test_assistant_blocks_become_agent_intermediate(self):
+        """Prior-turn assistant text + tool_use blocks land in agent_intermediate."""
+        from measurement.tokens import decompose_request
+
+        client = MagicMock()
+
+        def fake_count(*, model, messages=None, **kwargs):
+            if not messages:
+                return MagicMock(input_tokens=0)
+            text = ""
+            for m in messages:
+                content = m.get("content", "")
+                if isinstance(content, str):
+                    text += content
+                elif isinstance(content, list):
+                    for b in content:
+                        if isinstance(b, dict):
+                            text += b.get("text", "") + str(b.get("content", ""))
+            return MagicMock(input_tokens=len(text))
+
+        client.beta.messages.count_tokens.side_effect = fake_count
+
+        result = decompose_request(
+            system="",
+            messages=[
+                {"role": "user", "content": "USER_INITIAL"},
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "AGENT_REASONING"},
+                        {
+                            "type": "tool_use",
+                            "id": "1",
+                            "name": "search",
+                            "input": {"q": "hi"},
+                        },
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "1",
+                            "content": "RESULT",
+                        }
+                    ],
+                },
+            ],
+            tools=[],
+            output_tokens=0,
+            client=client,
+        )
+        # agent_intermediate captures the assistant text + a JSON-serialised
+        # representation of the tool_use block.
+        assert result["agent_intermediate"] > 0
+        # The user_message category still reflects only "USER_INITIAL".
+        assert result["user_message"] == len("USER_INITIAL")
+        # The retrieved_context category still reflects only the tool_result.
+        assert result["retrieved_context"] == len("RESULT")
 
 
 # =========================================================================
@@ -192,6 +255,7 @@ class TestRecordRun:
             "retrieved_context": 300,
             "user_message": 50,
             "tool_overhead": 150,
+            "agent_intermediate": 0,
             "response": 200,
         }
         record = record_run(
@@ -225,6 +289,7 @@ class TestRecordRun:
             "retrieved_context": 300,
             "user_message": 50,
             "tool_overhead": 150,
+            "agent_intermediate": 80,
             "response": 200,
         }
         record = record_run(
@@ -234,7 +299,7 @@ class TestRecordRun:
             api_usage=api_usage,
             response_text="x",
         )
-        assert record["decomposition_input_sum"] == 500 + 300 + 50 + 150
+        assert record["decomposition_input_sum"] == 500 + 300 + 50 + 150 + 80
 
     def test_handles_missing_cache_fields_gracefully(self):
         """Some test/mock api_usage objects may lack cache fields entirely."""
@@ -253,6 +318,7 @@ class TestRecordRun:
                 "retrieved_context": 0,
                 "user_message": 25,
                 "tool_overhead": 20,
+                "agent_intermediate": 0,
                 "response": 20,
             },
             api_usage=FakeUsage(),
@@ -293,8 +359,10 @@ class TestMethodologyGateRecord:
 
         from measurement.tokens import (
             AGENT_MODEL,
+            _BASELINE_MESSAGE,
             _extract_tool_result_text,
             _extract_user_message_text,
+            _extract_agent_intermediate_text,
             count_tokens,
         )
         from tests.cassette import save_cassette
@@ -358,6 +426,9 @@ class TestMethodologyGateRecord:
         retrieved_text = _extract_tool_result_text(scenario["messages"])
         if retrieved_text:
             texts_to_record.append(retrieved_text)
+        agent_text = _extract_agent_intermediate_text(scenario["messages"])
+        if agent_text:
+            texts_to_record.append(agent_text)
         if scenario["tools"]:
             tools_text = json.dumps(scenario["tools"], separators=(",", ":"))
             texts_to_record.append(tools_text)
@@ -366,6 +437,32 @@ class TestMethodologyGateRecord:
         for text in texts_to_record:
             if text not in counts_by_text:
                 counts_by_text[text] = count_tokens(text, client=client)
+
+        # Record the differential-shape counts decompose_request uses for
+        # system_prompt and tool_overhead (which include framing the
+        # standalone-text counts miss).
+        counts_by_shape: dict[str, int] = {}
+        counts_by_shape["baseline"] = int(
+            client.beta.messages.count_tokens(
+                model=AGENT_MODEL, messages=_BASELINE_MESSAGE
+            ).input_tokens
+        )
+        if scenario["system"]:
+            counts_by_shape["baseline+system"] = int(
+                client.beta.messages.count_tokens(
+                    model=AGENT_MODEL,
+                    messages=_BASELINE_MESSAGE,
+                    system=scenario["system"],
+                ).input_tokens
+            )
+        if scenario["tools"]:
+            counts_by_shape["baseline+tools"] = int(
+                client.beta.messages.count_tokens(
+                    model=AGENT_MODEL,
+                    messages=_BASELINE_MESSAGE,
+                    tools=scenario["tools"],
+                ).input_tokens
+            )
 
         fixture = {
             "model": AGENT_MODEL,
@@ -377,6 +474,7 @@ class TestMethodologyGateRecord:
                 "output_tokens": api_response.usage.output_tokens,
             },
             "count_tokens_for_pieces": counts_by_text,
+            "count_tokens_request_shapes": counts_by_shape,
         }
         save_cassette(fixture, CASSETTE_PATH)
 
@@ -416,7 +514,13 @@ class TestMethodologyGateReplay:
 
         input_sum = sum(
             decomposition[k]
-            for k in ("system_prompt", "retrieved_context", "user_message", "tool_overhead")
+            for k in (
+                "system_prompt",
+                "retrieved_context",
+                "user_message",
+                "tool_overhead",
+                "agent_intermediate",
+            )
         )
         api_input_tokens = fixture["api_create_response"]["input_tokens"]
         ratio = abs(input_sum - api_input_tokens) / api_input_tokens
