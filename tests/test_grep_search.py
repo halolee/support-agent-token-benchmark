@@ -158,6 +158,68 @@ class TestGrepCorpus:
             "deterministic results"
         )
 
+    def test_context_does_not_bleed_across_section_boundary(self):
+        """A match within `context_lines` of an H2 boundary must not
+        pull adjacent-section text into its context block — the agent
+        would otherwise see foreign-section content under this match's
+        citation. Codex PR #18 P2.
+
+        Scenario: match on the H2 heading line of "Booking and
+        Cancellation" with context_lines=5. Without clamping, backward
+        context would include the tail of "Invoice Questions" (which
+        ends just before line 26).
+        """
+        from architectures.grep_search.tools import _get_index, grep_corpus
+
+        r = grep_corpus(
+            keywords=["Booking and Cancellation"],
+            max_results=10,
+            context_lines=5,
+        )
+        heading_match = next(
+            (
+                m for m in r["matches"]
+                if m["section_id"] == "booking-and-cancellation"
+                and m["matched_line"].startswith("## ")
+            ),
+            None,
+        )
+        assert heading_match is not None, (
+            "expected a match on the 'Booking and Cancellation' H2 line"
+        )
+
+        # Every non-blank line in the returned context must belong to
+        # the same section as the match. Re-derive each context line's
+        # section by matching against the index. (We use line_number-
+        # anchored lookup so duplicate texts like blank lines don't
+        # collide across sections.)
+        index = _get_index()
+        match_lineno = heading_match["line_number"]
+        ctx_text = heading_match["context"].split("\n")
+
+        # ctx_text starts at some ctx_start ≤ match_lineno. Find the
+        # offset by aligning ctx_text[0] with the index.
+        ctx_start = None
+        for candidate in range(max(1, match_lineno - 5), match_lineno + 1):
+            if index[candidate - 1].text == ctx_text[0]:
+                # Confirm the full slice aligns.
+                slice_lines = [
+                    index[candidate - 1 + i].text for i in range(len(ctx_text))
+                ]
+                if slice_lines == ctx_text:
+                    ctx_start = candidate
+                    break
+        assert ctx_start is not None, "could not anchor context block back to index"
+
+        for offset, _ in enumerate(ctx_text):
+            real_line = index[ctx_start - 1 + offset]
+            assert real_line.section_id == heading_match["section_id"], (
+                f"context bled across boundary at line "
+                f"{real_line.line_number}: section_id="
+                f"{real_line.section_id!r} but match cites "
+                f"{heading_match['section_id']!r}"
+            )
+
     def test_context_window_does_not_crash_at_edges(self):
         """First and last lines of the corpus shouldn't index-error when
         building the ±context window.

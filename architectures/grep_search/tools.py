@@ -160,6 +160,13 @@ def grep_corpus(
     under `matched_keywords`. Truncation is by lowest line_number first
     (corpus order), which gives stable, deterministic results.
 
+    Context is clamped to the matched section. Walking outward from a
+    match stops at the first section boundary, so a match near an H2
+    won't pull adjacent-section text under this match's citation. The
+    practical effect: a match on (or near) an H2 line may get fewer
+    than `context_lines` of backward context — that's correct, the
+    section starts at the H2.
+
     Bounds (all defensive, mirror vector_search's k clamp):
       keywords        → first 8 non-empty strings only
       max_results     → clamped to [1, 20]
@@ -205,8 +212,27 @@ def grep_corpus(
     matches: list[dict[str, Any]] = []
     for lineno in sorted(hits.keys())[:bounded_max]:
         line = index[lineno - 1]
-        ctx_start = max(1, lineno - bounded_ctx)
-        ctx_end = min(len(index), lineno + bounded_ctx)
+        # Context window is clamped to the matched section. An absolute
+        # ±bounded_ctx slice would bleed into adjacent sections when the
+        # match sits near an H2 boundary — the agent would then see
+        # foreign-section text under this section's citation. Walking
+        # outward and stopping at the first section_id change keeps the
+        # context honest (Codex PR #18 P2).
+        section_id = line.section_id
+        ctx_start = lineno
+        for _ in range(bounded_ctx):
+            if ctx_start <= 1:
+                break
+            if index[ctx_start - 2].section_id != section_id:
+                break
+            ctx_start -= 1
+        ctx_end = lineno
+        for _ in range(bounded_ctx):
+            if ctx_end >= len(index):
+                break
+            if index[ctx_end].section_id != section_id:
+                break
+            ctx_end += 1
         context_block = "\n".join(
             index[n - 1].text for n in range(ctx_start, ctx_end + 1)
         )
