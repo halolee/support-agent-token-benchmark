@@ -212,11 +212,17 @@ def search_flights(
     if destination:
         where_parts.append("arrival_airport = ?")
         params.append(destination)
+    # Compare on date(scheduled_departure) so date-only inputs
+    # ("2026-06-02") behave inclusively at both ends — a bare-date
+    # date_to was previously string-compared against full timestamps
+    # ("2026-06-02 14:30:00…"), excluding every flight later than
+    # midnight that day. Timestamp inputs work too since date() truncates
+    # before comparing.
     if date_from:
-        where_parts.append("scheduled_departure >= ?")
+        where_parts.append("date(scheduled_departure) >= date(?)")
         params.append(date_from)
     if date_to:
-        where_parts.append("scheduled_departure <= ?")
+        where_parts.append("date(scheduled_departure) <= date(?)")
         params.append(date_to)
 
     where_clause = " AND ".join(where_parts)

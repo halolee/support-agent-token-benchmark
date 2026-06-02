@@ -14,13 +14,19 @@ Loop shape (uniform across architectures per METHODOLOGY):
 
 Instrumentation note (METHODOLOGY): token decomposition is captured at
 EVERY model call, not just the final one. Multi-turn loops accumulate
-retrieved_context tokens across turns; only summing per-turn captures the
-true cost.
+retrieved_context tokens across turns; only summing per-turn captures
+the true cost.
 
-Audit_log is excluded from per-task token decomposition. The agent still
-calls it (per the modularity contract), but we subtract its contribution
-from the recorded retrieved_context category — see `_excluded_audit_text`
-in `run_task`.
+Audit_log is excluded from the reported per-task token decomposition
+(METHODOLOGY §"Audit log specification"). The record carries a two-line
+ledger:
+  - `decomposition` + `decomposition_input_sum` — METHODOLOGY-compliant,
+    audit_log subtracted; what downstream cost comparison reads.
+  - `decomposition_input_sum_with_audit` — audit_log included; what the
+    5% measurement gate validates against `api_input_tokens`.
+  - `audit_log_tokens_in_retrieved_context` and
+    `audit_log_tokens_in_agent_intermediate` — the amounts subtracted.
+See `run_task` for the ledger construction.
 """
 from __future__ import annotations
 
@@ -214,19 +220,45 @@ def run_task(
             else ""
         )
 
-    # METHODOLOGY §"Audit log specification" excludes audit_log calls
-    # from per-task COST decomposition, but the 5% gate is about
-    # MEASUREMENT correctness — our decomposition needs to account for
-    # all tokens the API charged for. Resolution: report the inclusive
-    # decomposition (gate holds against raw api_input_tokens) plus a
-    # separate `audit_log_*` field giving the subtraction the comparison
-    # report will apply downstream.
+    # METHODOLOGY §"Audit log specification" excludes audit_log token
+    # cost from the per-task decomposition. The 5% gate is about
+    # measurement correctness — needs to account for everything the API
+    # charged for, including audit_log. Resolution (two-line ledger):
+    #
+    #   record["decomposition"]                      METHODOLOGY-compliant
+    #                                                (audit_log excluded)
+    #   record["decomposition_input_sum"]            sum of the above
+    #                                                (also audit-excluded;
+    #                                                this is what
+    #                                                downstream cost
+    #                                                comparison reads)
+    #   record["audit_log_tokens_*"]                 amounts subtracted
+    #   record["decomposition_input_sum_with_audit"] for the gate check
+    #                                                (audit-inclusive,
+    #                                                ≈ api_input_tokens
+    #                                                within 5%)
     audit_result_offset, audit_use_offset = _audit_offsets(messages, client=client)
+
+    inclusive_input_sum = (
+        summed["system_prompt"]
+        + summed["retrieved_context"]
+        + summed["user_message"]
+        + summed["tool_overhead"]
+        + summed["agent_intermediate"]
+    )
+
+    reporting_decomp = dict(summed)
+    reporting_decomp["retrieved_context"] = max(
+        0, reporting_decomp["retrieved_context"] - audit_result_offset
+    )
+    reporting_decomp["agent_intermediate"] = max(
+        0, reporting_decomp["agent_intermediate"] - audit_use_offset
+    )
 
     record = record_run(
         architecture="naive_rag",
         task_id=task["task_id"],
-        decomposition=summed,
+        decomposition=reporting_decomp,
         api_usage=_MergedUsage(
             input_tokens=total_api_input,
             output_tokens=total_api_output,
@@ -241,6 +273,7 @@ def run_task(
             "tools_called": tools_called,
             "audit_log_tokens_in_retrieved_context": audit_result_offset,
             "audit_log_tokens_in_agent_intermediate": audit_use_offset,
+            "decomposition_input_sum_with_audit": inclusive_input_sum,
         }
     )
     return record

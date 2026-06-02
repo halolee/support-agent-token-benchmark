@@ -102,10 +102,15 @@ class TestSearchFlights:
     def test_filters_by_origin(self):
         from architectures._shared.booking_tools import search_flights
 
-        # ZRH is in the corpus; any flight from ZRH should return rows.
-        result = search_flights(origin="ZRH", limit=3)
-        for row in result.get("results", []):
-            assert row["departure_airport"] == "ZRH"
+        # BSL is the busiest airport in the fixture data (>3k flights);
+        # using a known-populated origin so an empty result-set regression
+        # would actually be caught (ZRH had zero rows in the fixture,
+        # which made the previous version of this test silently pass).
+        result = search_flights(origin="BSL", limit=3)
+        rows = result.get("results", [])
+        assert len(rows) > 0, "expected at least one flight from BSL in fixture"
+        for row in rows:
+            assert row["departure_airport"] == "BSL"
 
     def test_limit_is_bounded(self):
         from architectures._shared.booking_tools import search_flights
@@ -113,6 +118,37 @@ class TestSearchFlights:
         # Pass an absurd limit; verify it's clamped to 50.
         result = search_flights(origin="ZRH", limit=10000)
         assert len(result.get("results", [])) <= 50
+
+    def test_date_to_includes_same_day_flights(self):
+        """Regression for Codex PR #17 P2: a bare-date date_to was
+        string-compared against full-timestamp scheduled_departure,
+        excluding every flight later than midnight that day. The fix
+        compares on date(scheduled_departure), so same-day flights stay
+        in for an inclusive end date.
+        """
+        from architectures._shared.booking_tools import _connect, search_flights
+
+        # Find an existing flight's scheduled_departure date so the
+        # same-day query is grounded in real fixture data. BSL is the
+        # busiest origin (>3k rows).
+        with _connect() as conn:
+            row = conn.execute(
+                "SELECT date(scheduled_departure) AS d "
+                "FROM flights WHERE departure_airport = 'BSL' "
+                "ORDER BY scheduled_departure LIMIT 1"
+            ).fetchone()
+        assert row is not None, "no BSL flights in fixture"
+        date_str = row["d"]  # YYYY-MM-DD form
+
+        # date_to set to that bare date — same-day flights must still be
+        # returned (count > 0); pre-fix this would return 0 same-day rows.
+        result = search_flights(
+            origin="BSL", date_from=date_str, date_to=date_str, limit=50
+        )
+        assert result.get("count", 0) > 0, (
+            f"Expected at least one same-day flight for {date_str!r}; "
+            f"the date_to comparison may have regressed."
+        )
 
 
 class TestSchemas:
