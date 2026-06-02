@@ -156,19 +156,30 @@ For each task run, the following are recorded from the API response:
 | `cache_creation_input_tokens`  | API usage object (zero for Naive RAG / Grep search / Hybrid RAG, non-zero for Cached RAG) |
 | `cache_read_input_tokens`      | API usage object (zero for Naive RAG / Grep search / Hybrid RAG, non-zero for Cached RAG) |
 
-These raw numbers are then decomposed into five categories matching the [Silicon Data methodology](https://www.silicondata.com/blog/llm-cost-per-token):
+These raw numbers are then decomposed into six categories — the original five from the [Silicon Data methodology](https://www.silicondata.com/blog/llm-cost-per-token) plus `agent_intermediate`, which we added in Phase 2 once multi-turn tool loops landed (see "Multi-turn extension" below):
 
 1. **System prompt tokens** — counted via Anthropic's `client.beta.messages.count_tokens()` API on the system prompt string
 2. **Retrieved/injected context tokens** — counted via `count_tokens` on the concatenated tool response text
 3. **User message tokens** — counted via `count_tokens` on the user message
 4. **Tool call overhead tokens** — counted via `count_tokens` on the tool schema JSON sent in the request
-5. **Response tokens** — provider-reported `output_tokens`
+5. **Agent intermediate tokens** — counted via `count_tokens` on assistant-role content (text + `tool_use` blocks) from PRIOR turns that gets echoed back as input on subsequent turns
+6. **Response tokens** — provider-reported `output_tokens`
 
 ### Tokenizer note
 
 This project does NOT use `tiktoken`. `tiktoken` is OpenAI's tokenizer and will produce wrong counts for Anthropic models. Use Anthropic's official `count_tokens` API for all input decomposition.
 
-The sum of categories 1–4 should approximately equal `input_tokens` reported by the API, within small variance for how messages are framed for the API call. The runner asserts this equality within 5% tolerance and flags discrepancies.
+The sum of categories 1–5 should approximately equal `input_tokens` reported by the API, within small variance for how messages are framed for the API call. The runner asserts this equality within 5% tolerance and flags discrepancies.
+
+### Multi-turn extension (`agent_intermediate`)
+
+The Silicon Data methodology was specified for single-turn API calls. The four input categories (system, retrieved, user, tools) cover every token the customer or platform contributes to a single request.
+
+Phase 2's architectures are multi-turn tool-use loops: the model calls a tool, sees the result, may call another, eventually produces a no-tool-call response. On each loop iteration, the conversation `messages` list grows by an assistant turn (text + `tool_use` blocks) and a follow-up user turn carrying `tool_result` blocks. Anthropic charges `input_tokens` per turn on the full accumulated history — so prior-turn assistant content is re-paid on every subsequent turn.
+
+Without a sixth category, that re-paid assistant cost has no Silicon Data bucket. For a typical 4-turn task we observed ~5,000 unbucketed tokens (~25% of API-reported `input_tokens`), well outside the 5% gate. Adding `agent_intermediate` closes the gap and names the cost honestly — it's the agent talking to itself across turns, and it's a real component of the architecture comparison: a multi-turn architecture with chatty `tool_use` arguments will pay more here than a terse one.
+
+For Cached RAG (Phase 3), `agent_intermediate` is the category most affected by prompt caching when assistant prefixes are stable.
 
 ## What does not get counted
 

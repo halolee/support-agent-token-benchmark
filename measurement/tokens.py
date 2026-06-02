@@ -1,18 +1,26 @@
-"""Token counting and 5-category decomposition.
+"""Token counting and 6-category decomposition.
 
-The 5-category Silicon Data decomposition (METHODOLOGY § "What gets counted"):
+The 6-category extension of the Silicon Data decomposition (METHODOLOGY §
+"What gets counted"). The original Silicon Data model has 5 categories;
+adding `agent_intermediate` was necessary once multi-turn tool loops
+landed in Phase 2 — the model's own prior-turn assistant content gets
+echoed back as input on every subsequent turn, and that cost wasn't
+attributable to any of the original 5 categories.
 
-  1. system_prompt       — count_tokens on the system prompt string
-  2. retrieved_context   — count_tokens on concatenated tool_result content
-  3. user_message        — count_tokens on user-role text content
-  4. tool_overhead       — count_tokens on the tools-schema JSON
-  5. response            — provider-reported `output_tokens` (NOT count_tokens)
+  1. system_prompt        — count_tokens on the system prompt string
+  2. retrieved_context    — count_tokens on concatenated tool_result content
+  3. user_message         — count_tokens on user-role text content
+  4. tool_overhead        — count_tokens on the tools-schema JSON
+  5. agent_intermediate   — count_tokens on assistant-role content from prior
+                            turns (text + tool_use blocks) that gets echoed
+                            back as input on subsequent turns
+  6. response             — provider-reported `output_tokens` (NOT count_tokens)
 
-The sum of categories 1-4 must equal API-reported `input_tokens` within 5%
-(METHODOLOGY's tolerance, validated by `tests/test_tokens.py::
-TestMethodologyGate`). The gap reflects API framing overhead — message
-delimiters, role markers, etc. — which is not attributable to any single
-input category.
+The sum of categories 1-5 (input-side) must equal API-reported
+`input_tokens` within 5% (METHODOLOGY's tolerance, validated by
+`tests/test_tokens.py::TestMethodologyGate`). The remaining gap reflects
+API framing overhead — message delimiters, role markers, etc. — which is
+not attributable to any single input category.
 
 Tokenization rule: this module uses Anthropic's official
 `client.beta.messages.count_tokens()` API. We do NOT use `tiktoken`
@@ -49,6 +57,38 @@ def count_tokens(text: str, *, client: anthropic.Anthropic) -> int:
         model=AGENT_MODEL,
         messages=[{"role": "user", "content": text}],
     )
+    return int(response.input_tokens)
+
+
+# Minimal user message used as the differential baseline for system_prompt
+# and tool_overhead. The API rejects whitespace-only content, so we use a
+# fixed single-character marker; its contribution cancels out in the
+# differential.
+_BASELINE_MESSAGE = [{"role": "user", "content": "_"}]
+
+
+def _count_with_request_shape(
+    *,
+    client: anthropic.Anthropic,
+    system: str | None = None,
+    tools: list[dict] | None = None,
+) -> int:
+    """count_tokens against a baseline user message, optionally with
+    system and/or tools attached. Used for the differential measurement
+    of system_prompt and tool_overhead, which include framing the
+    standalone-text counting can't see (the API renders tool schemas in
+    a model-specific template that adds ~600 tokens of per-call framing
+    a `json.dumps(tools)` doesn't capture).
+    """
+    kwargs: dict[str, Any] = {
+        "model": AGENT_MODEL,
+        "messages": _BASELINE_MESSAGE,
+    }
+    if system:
+        kwargs["system"] = system
+    if tools:
+        kwargs["tools"] = tools
+    response = client.beta.messages.count_tokens(**kwargs)
     return int(response.input_tokens)
 
 
@@ -98,6 +138,50 @@ def _extract_tool_result_text(messages: list[dict]) -> str:
     return "\n".join(parts)
 
 
+def _extract_agent_intermediate_text(messages: list[dict]) -> str:
+    """Concatenated text/tool_use payload from assistant-role messages.
+
+    In multi-turn tool loops, each assistant turn's content (text blocks
+    + tool_use blocks) is appended to `messages` and echoed back as input
+    on every subsequent API call. Those echoed tokens don't fit any of
+    the original 5 Silicon Data categories — they're the agent talking
+    to itself across turns. This helper captures them so the
+    decomposition gate holds for multi-turn architectures.
+
+    Anthropic's tokenizer counts text blocks as their text content and
+    tool_use blocks roughly as `name + serialised input`. We mirror that
+    by serialising tool_use blocks as a compact JSON string. The gate's
+    5% tolerance absorbs the small per-block framing overhead.
+    """
+    parts: list[str] = []
+    for msg in messages:
+        if msg.get("role") != "assistant":
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            parts.append(content)
+            continue
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "text":
+                parts.append(block.get("text", ""))
+            elif btype == "tool_use":
+                tu_payload = {
+                    "name": block.get("name", ""),
+                    "input": block.get("input", {}),
+                }
+                parts.append(
+                    json.dumps(tu_payload, separators=(",", ":"), default=str)
+                )
+            elif btype == "thinking":
+                parts.append(block.get("thinking", ""))
+    return "\n".join(parts)
+
+
 # ---------------------------------------------------------------------------
 # decompose_request
 # ---------------------------------------------------------------------------
@@ -111,10 +195,10 @@ def decompose_request(
     output_tokens: int,
     client: anthropic.Anthropic,
 ) -> dict[str, int]:
-    """Decompose a single API call's tokens into 5 categories.
+    """Decompose a single API call's tokens into 6 categories.
 
-    Categories 1-4 are counted via the count_tokens API on the relevant
-    text. Category 5 (response) is the provider-reported `output_tokens`
+    Categories 1-5 are counted via the count_tokens API on the relevant
+    text. Category 6 (response) is the provider-reported `output_tokens`
     — this is mandated by METHODOLOGY and is NOT computed via count_tokens
     (output tokens differ from input tokens in framing and re-counting
     would inflate the number).
@@ -127,8 +211,37 @@ def decompose_request(
         and the gate may fail — but that regime isn't what we measure.
         See `tests/test_tokens.py::TestMethodologyGateRecord` for the
         realistic-scenario baseline.
+
+    METHODOLOGY note on multi-turn loops:
+        `agent_intermediate` captures assistant-role content (text +
+        tool_use blocks) that the model emitted on PRIOR turns and gets
+        re-sent as input on subsequent turns. For a single-turn call this
+        category is zero; for multi-turn tool loops it grows quickly. The
+        gate's 5% tolerance is held across both regimes by including it.
     """
-    system_tokens = count_tokens(system, client=client) if system else 0
+    # system_prompt and tool_overhead are measured DIFFERENTIALLY against
+    # a baseline empty user message — the API renders tool schemas in a
+    # model-specific template that adds ~600 tokens of per-call framing
+    # which `count_tokens(json.dumps(tools))` doesn't capture. Caching
+    # the baseline on the client avoids one count_tokens call per
+    # decomposition; count_tokens itself is not billed for input tokens
+    # (per Anthropic's count_tokens endpoint docs).
+    if system or tools:
+        baseline = _count_with_request_shape(client=client)
+    else:
+        baseline = 0
+
+    if system:
+        system_total = _count_with_request_shape(client=client, system=system)
+        system_tokens = max(0, system_total - baseline)
+    else:
+        system_tokens = 0
+
+    if tools:
+        tools_total = _count_with_request_shape(client=client, tools=tools)
+        tools_tokens = max(0, tools_total - baseline)
+    else:
+        tools_tokens = 0
 
     user_text = _extract_user_message_text(messages)
     user_tokens = count_tokens(user_text, client=client) if user_text else 0
@@ -138,14 +251,17 @@ def decompose_request(
         count_tokens(retrieved_text, client=client) if retrieved_text else 0
     )
 
-    tools_text = json.dumps(tools, separators=(",", ":")) if tools else ""
-    tools_tokens = count_tokens(tools_text, client=client) if tools_text else 0
+    agent_text = _extract_agent_intermediate_text(messages)
+    agent_intermediate_tokens = (
+        count_tokens(agent_text, client=client) if agent_text else 0
+    )
 
     return {
         "system_prompt": system_tokens,
         "retrieved_context": retrieved_tokens,
         "user_message": user_tokens,
         "tool_overhead": tools_tokens,
+        "agent_intermediate": agent_intermediate_tokens,
         "response": int(output_tokens),
     }
 
@@ -160,6 +276,7 @@ _INPUT_CATEGORIES = (
     "retrieved_context",
     "user_message",
     "tool_overhead",
+    "agent_intermediate",
 )
 
 

@@ -45,13 +45,53 @@ def load_cassette(path: Path) -> dict[str, Any] | None:
 def make_replay_client(fixture: dict[str, Any]) -> MagicMock:
     """Build a mock Anthropic client that replays count_tokens responses.
 
-    The mock raises KeyError if asked to count a text not in the recorded
-    set — this is intentional, so stale cassettes fail loudly.
+    The cassette format supports two kinds of recorded counts:
+      - `count_tokens_for_pieces`: keyed by message text content (used
+        for standalone count_tokens(text, ...) calls).
+      - `count_tokens_request_shapes` (optional, added in Phase 2): keyed
+        by a discriminator built from the call shape (baseline, +system,
+        +tools). Used by decompose_request's differential measurement of
+        system_prompt and tool_overhead, which include framing that pure
+        text counts can't see.
+
+    The mock raises KeyError if asked to count something not in the
+    recorded set — stale cassettes fail loudly rather than silently
+    passing on stale data.
     """
-    counts_by_text: dict[str, int] = fixture["count_tokens_for_pieces"]
+    counts_by_text: dict[str, int] = fixture.get("count_tokens_for_pieces", {})
+    counts_by_shape: dict[str, int] = fixture.get("count_tokens_request_shapes", {})
 
     def count_tokens_side_effect(*args, **kwargs):
+        system = kwargs.get("system")
+        tools = kwargs.get("tools")
         messages = kwargs.get("messages", [])
+
+        # Differential-shape calls (decompose_request's baseline + system
+        # + tools probes) use a sentinel single-character message. Route
+        # those to the shape-keyed counts.
+        is_shape_call = False
+        if messages and len(messages) == 1:
+            content = messages[0].get("content", "")
+            if isinstance(content, str) and content == "_":
+                is_shape_call = True
+
+        if is_shape_call:
+            if system and not tools:
+                shape_key = "baseline+system"
+            elif tools and not system:
+                shape_key = "baseline+tools"
+            elif system and tools:
+                shape_key = "baseline+system+tools"
+            else:
+                shape_key = "baseline"
+            if shape_key not in counts_by_shape:
+                raise KeyError(
+                    f"Cassette has no recorded count for shape {shape_key!r}. "
+                    f"Re-record with --run-live-api."
+                )
+            return MagicMock(input_tokens=counts_by_shape[shape_key])
+
+        # Standalone count_tokens(text, ...) call — key by message text.
         text = ""
         if messages:
             content = messages[0].get("content", "")

@@ -245,11 +245,12 @@ def generate_report(
             "",
             "## Token decomposition (Silicon Data methodology)",
             "",
-            "Per the [Silicon Data 5-category model](https://www.silicondata.com/blog/llm-cost-per-token), "
-            "every model call's token cost is the sum of four input categories and one output category. "
-            "The runner asserts that categories ①–④ sum to API-reported `input_tokens` "
+            "Per the [Silicon Data model](https://www.silicondata.com/blog/llm-cost-per-token), "
+            "extended with a sixth category (`agent_intermediate`) for multi-turn tool loops, "
+            "every model call's token cost is the sum of five input categories and one output category. "
+            "The runner asserts that categories ①–⑤ sum to API-reported `input_tokens` "
             "within 5%; discrepancies are flagged, not silenced "
-            "(see `METHODOLOGY.md` §\"What gets counted\").",
+            "(see `METHODOLOGY.md` §\"What gets counted\" and §\"Multi-turn extension\").",
             "",
             "```mermaid",
             "flowchart LR",
@@ -257,15 +258,17 @@ def generate_report(
             "    SP[\"① System prompt<br/>~300–500 tokens<br/>architecture-set, ~constant per arch\"] -->|added per call| API",
             "    TS[\"④ Tool call overhead<br/>tool schema JSON<br/>architecture-set, ~constant per arch\"] -->|added per call| API",
             "    CTX[\"② Retrieved/injected context<br/>retrieval architecture sets the size<br/>where the comparison lives\"] -->|added per call| API",
-            "    API -->|\"⑤ Response<br/>agent-set, varies per task\"| Out[Agent response]",
+            "    AI[\"⑤ Agent intermediate<br/>prior-turn assistant content (text + tool_use)<br/>re-sent every turn\"] -->|added per call| API",
+            "    API -->|\"⑥ Response<br/>agent-set, varies per task\"| Out[Agent response]",
             "",
-            "    API ==> Assert{{\"input_tokens ≈ ① + ② + ③ + ④<br/>within 5% tolerance\"}}",
+            "    API ==> Assert{{\"input_tokens ≈ ① + ② + ③ + ④ + ⑤<br/>within 5% tolerance\"}}",
             "```",
             "",
             "The architecture comparison lives in category ②. Categories ①, ③, ④ are "
-            "approximately constant within an architecture; category ⑤ is bounded by the agent's "
-            "`max_tokens` and varies with task. Architecture differences in mean tokens per task are "
-            "driven primarily by ② (retrieved/injected context).",
+            "approximately constant within an architecture; category ⑤ scales with loop length "
+            "and tool_use verbosity; category ⑥ is bounded by the agent's `max_tokens` and varies "
+            "with task. Architecture differences in mean tokens per task are driven primarily by "
+            "② (retrieved/injected context), with ⑤ as a secondary driver for chatty multi-turn agents.",
         ]
     )
     output_path.write_text("\n".join(lines) + "\n")

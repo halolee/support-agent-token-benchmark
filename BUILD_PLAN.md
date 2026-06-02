@@ -44,7 +44,7 @@ This is the load-bearing measurement code. Build it before any architecture, bec
 
 - [ ] Implement `measurement/tokens.py` with:
   - `count_tokens(text: str) -> int` using Anthropic's `client.beta.messages.count_tokens()` API
-  - `decompose_request(system, messages, tools) -> dict` returning the 5-category breakdown
+  - `decompose_request(system, messages, tools) -> dict` returning the 6-category breakdown (the original Silicon Data five plus `agent_intermediate` for multi-turn loops — see METHODOLOGY §"Multi-turn extension")
   - `record_run(architecture, task_id, decomposition, api_usage, response) -> dict` for structured logging
 - [ ] Unit test the decomposition: sum of categories should equal API-reported `input_tokens` within 5%
 

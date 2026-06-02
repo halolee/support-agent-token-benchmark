@@ -70,12 +70,29 @@ class TestParseArgs:
 
 
 def _make_mock_client(
-    *, api_input_tokens: int, api_output_tokens: int, count_tokens_value: int = 50
+    *,
+    api_input_tokens: int,
+    api_output_tokens: int,
+    count_tokens_value: int = 50,
+    baseline_value: int = 5,
+    system_delta: int | None = None,
+    tools_delta: int | None = None,
 ) -> MagicMock:
-    """Construct a mocked Anthropic client with controllable token counts."""
+    """Construct a mocked Anthropic client with controllable token counts.
+
+    decompose_request issues two kinds of count_tokens calls:
+      (a) Standalone text counts — `messages=[{role:user, content:<text>}]`.
+          Returns `count_tokens_value` for any non-baseline text.
+      (b) Differential shape probes — `messages=_BASELINE_MESSAGE` plus
+          optional `system=`/`tools=`. Returns `baseline_value`, or
+          `baseline_value + system_delta` / `+ tools_delta` when those
+          kwargs are present.
+
+    Defaults are tuned so the smoke flow's sum lands on `api_input_tokens`:
+    one system + one user piece, no tools → sum = system_delta + count_tokens_value.
+    """
     client = MagicMock()
 
-    # messages.create() response
     create_response = MagicMock()
     create_response.content = [MagicMock(text="Mocked agent response.")]
     create_response.usage = MagicMock(
@@ -86,10 +103,26 @@ def _make_mock_client(
     )
     client.messages.create.return_value = create_response
 
-    # count_tokens responses (uniform value across all pieces)
-    client.beta.messages.count_tokens.return_value = MagicMock(
-        input_tokens=count_tokens_value
-    )
+    def count_tokens_side_effect(*args, **kwargs):
+        messages = kwargs.get("messages", [])
+        system = kwargs.get("system")
+        tools = kwargs.get("tools")
+        is_baseline = (
+            isinstance(messages, list)
+            and len(messages) == 1
+            and isinstance(messages[0].get("content"), str)
+            and messages[0]["content"] == "_"
+        )
+        if is_baseline:
+            total = baseline_value
+            if system and system_delta is not None:
+                total += system_delta
+            if tools and tools_delta is not None:
+                total += tools_delta
+            return MagicMock(input_tokens=total)
+        return MagicMock(input_tokens=count_tokens_value)
+
+    client.beta.messages.count_tokens.side_effect = count_tokens_side_effect
     return client
 
 
@@ -126,12 +159,13 @@ class TestSmokeAgent:
         record = smoke_agent(client, task)
 
         assert "decomposition" in record
-        # All 5 categories present
+        # All 6 categories present (5 input-side + response)
         for cat in (
             "system_prompt",
             "retrieved_context",
             "user_message",
             "tool_overhead",
+            "agent_intermediate",
             "response",
         ):
             assert cat in record["decomposition"]
@@ -146,12 +180,16 @@ class TestRunSmoke:
     def test_passes_gate_when_sums_match_within_tolerance(self, capsys):
         from measurement.runner import run_smoke
 
-        # API says 100, count_tokens for each piece returns 50.
-        # We have system + user (2 non-empty pieces), so sum = 100 → exact match.
+        # API says 100. Smoke scenario has system + user, no tools, no
+        # tool_results, no assistant turns. Differential gives
+        # system_tokens = system_delta, plus standalone user = 50. So
+        # sum = 50 + 50 = 100 → exact match.
         client = _make_mock_client(
             api_input_tokens=100,
             api_output_tokens=5,
             count_tokens_value=50,
+            baseline_value=5,
+            system_delta=50,
         )
         exit_code = run_smoke(client=client)
         assert exit_code == 0
@@ -161,11 +199,13 @@ class TestRunSmoke:
     def test_fails_gate_when_sum_diverges_beyond_tolerance(self, capsys):
         from measurement.runner import run_smoke
 
-        # API says 100, but count_tokens returns 80 per call → sum=160 → 60% over.
+        # API says 100. With system_delta=80 and user=80, sum=160 → 60% over.
         client = _make_mock_client(
             api_input_tokens=100,
             api_output_tokens=5,
             count_tokens_value=80,
+            baseline_value=5,
+            system_delta=80,
         )
         exit_code = run_smoke(client=client)
         assert exit_code == 1
@@ -201,6 +241,7 @@ class TestReport:
                         "retrieved_context": 800,
                         "user_message": 50,
                         "tool_overhead": 200,
+                        "agent_intermediate": 0,
                         "response": 250,
                     },
                     "api_input_tokens": 1550,

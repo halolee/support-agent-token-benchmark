@@ -2,14 +2,18 @@
   "anthropic_sdk_version": "0.104.1",
   "api_create_response": {
     "input_tokens": 192,
-    "output_tokens": 9
+    "output_tokens": 10
   },
   "count_tokens_for_pieces": {
     "Hi, I'd like to check the status of my booking ABC123. I'm supposed to fly tomorrow from Zurich to New York and I'm getting nervous because I haven't received any updates.": 48,
     "You are a customer support agent for Swiss Airlines. Your role is to help customers with their bookings, flights, and travel policies.\n\nGuidelines:\n- Be concise but complete. Don't pad responses with unnecessary pleasantries.\n- When citing policy, always reference the specific section.\n- If a customer's question requires looking up data, use the tools provided.\n- If you don't know something, say so directly rather than guessing.\n- Confirm booking IDs back to the customer before making changes.\n- For policy questions outside your knowledge, escalate to a human agent.\n\nTone: professional, helpful, calm. The customer is often stressed about travel.": 150
   },
+  "count_tokens_request_shapes": {
+    "baseline": 8,
+    "baseline+system": 152
+  },
   "model": "claude-sonnet-4-6",
-  "recorded_at": "2026-05-25T12:33:53.487295+00:00",
+  "recorded_at": "2026-06-02T10:45:15.102978+00:00",
   "scenario": {
     "messages": [
       {
