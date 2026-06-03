@@ -47,46 +47,23 @@ The `policy_classes_invoked` and `booking_data_required` fields are metadata for
 
 ## Task classes
 
+The canonical 17-task frozen set lives in `measurement/tasks.jsonl` (marked `# COMPLETE`); expected answers are in `measurement/tasks_expected_answers.md`. The class descriptions below define what each class *is* — for the actual phrasings and rubrics, read the JSONL.
+
 ### Pure policy (3 tasks)
 
 Questions answerable entirely from the FAQ corpus, no booking data required.
-
-Examples (customer-phrased):
-- POL-001: "If my flight is cancelled by the airline, do I just get my money back automatically or do I need to ask?"
-- POL-002: "I'm bringing a stroller and a car seat for my baby — does that count against my baggage allowance?"
-- POL-003: "How long before takeoff do I need to be at the gate? Some airlines say 30 minutes, some say 45 — what's yours?"
 
 ### Pure transactional (3 tasks)
 
 Questions requiring booking data only, no policy lookup. Control class — all architectures should perform similarly.
 
-Examples:
-- TXN-001: "Can you check what time my flight ABC123 leaves tomorrow?"
-- TXN-002: "I'm looking at flights from Zurich to New York on December 15 — what's available?"
-- TXN-003: "How much did I end up paying total for booking XYZ?"
-
 ### Mixed (8 tasks)
 
 Questions requiring both policy and booking data. This is where production traffic actually lives, and where architectural differences become most visible. Weighted heavily for realistic distribution.
 
-Examples (customer-phrased, avoid mapping to category names):
-- MIX-001: "I bought a one-way ticket to Zurich last month and need to push my departure back by two days — what are my options here?"
-- MIX-002: "My flight got cancelled, the one I had on booking ABC. Am I going to get my money back or do they put me on a different flight?"
-- MIX-003: "I'm flying economy on flight XYZ next week — can I bring a guitar as carry-on or does that have to go below?"
-- MIX-004: "I want to cancel my trip entirely and rebook for next month — is that a thing I can do or do I lose the money?"
-- MIX-005: "I paid for booking DEF with a voucher from a previous cancelled flight — can I still change the date online or do I need to call someone?"
-- MIX-006: "I have a connecting flight in Frankfurt with only 45 minutes between landing and takeoff — is that going to be a problem if the first leg is delayed?"
-- MIX-007: "My daughter is 16 and traveling alone next month on booking GHI — is there anything I need to set up or sign?"
-- MIX-008: "I need to add my frequent flyer number to my existing booking JKL — can I do that online or is it too late?"
-
 ### Edge case (3 tasks)
 
 Tests conditional policy logic, exceptions, ambiguous routing. Often expose failure modes that aggregate metrics hide.
-
-Examples:
-- EDGE-001: A question whose answer depends on conditions in the booking data that aren't explicitly asked about (tests whether agent retrieves enough context)
-- EDGE-002: A question whose policy answer has an exception the agent must surface (tests handling of conditional clauses)
-- EDGE-003: A question that's ambiguous between two policy classes (tests how each architecture's retrieval handles ambiguity)
 
 ## Why these classes and this distribution
 
@@ -129,14 +106,6 @@ A 10% random sample of judge decisions is manually reviewed to detect judge bias
 
 Once a task ID is published in a release, the task content is frozen. New tasks get new IDs. Edits create a new ID and deprecate the old one. This preserves comparability across versions.
 
-## Building the actual task set
+## Adding new tasks after the freeze
 
-The examples above are seed phrasings. The actual tasks need to be written by:
-
-1. Reading `corpus/swiss_faq.md` (after Phase 1 corpus inventory) and identifying real policy classes
-2. Reading `data/travel.sqlite` schema and identifying real bookings to reference (or designing tasks that work against the actual data)
-3. Writing tasks in customer-style language — the kind of phrasing that would actually arrive in a support inbox
-4. Validating each task by manually answering it yourself before adding to the set
-5. Re-reading each task with Check 2 in mind: does this phrasing favor any architecture?
-
-The task set is small (~17 tasks) precisely so this manual validation is tractable.
+The 17-task set in `measurement/tasks.jsonl` is frozen. Per CLAUDE.md invariants, new tasks get new IDs (e.g., `MIX-009`); edits to an existing row create a new ID and deprecate the old one. The original authoring process — read `corpus/swiss_faq.md`, identify real policy classes against `data/travel.sqlite`, write in customer voice, manually answer, re-read against Check 2 — applies equally to any addition. The validator (`measurement/scripts/validate_tasks.py`) gates all of the above; run it before committing.
