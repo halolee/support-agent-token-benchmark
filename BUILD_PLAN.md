@@ -14,18 +14,17 @@ Phased execution plan. Each phase produces a working, independently-shippable ar
 
 Before designing anything, get the corpus and database in place and inventory what's there.
 
-- [ ] **Corpus and database are hosted as direct downloads.** The LangGraph tutorial's `db.py` fetches both at runtime from a public GCS bucket; we can fetch them the same way without cloning the LangGraph repo or running the notebook:
-  - `curl -L -o corpus/swiss_faq.md https://storage.googleapis.com/benchmarks-artifacts/travel-db/swiss_faq.md`
-  - `curl -L -o data/travel.sqlite https://storage.googleapis.com/benchmarks-artifacts/travel-db/travel2.sqlite` *(exact filename — likely `travel2.sqlite` — should be confirmed from the tutorial's `db.py` setup cell; rename the downloaded file to `travel.sqlite` after download to match the path references throughout these docs)*
-- [ ] Verify integrity: `file data/travel.sqlite` should report "SQLite 3.x database"; `head corpus/swiss_faq.md` should show non-empty Markdown
-- [ ] For tutorial context, browse the canonical notebook at `https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb` — note what tools it defines and what dialog routing it uses. The LangGraph project restructured; the latest docs index is at `https://docs.langchain.com/oss/python/langgraph/overview` (the older `examples/customer-support/` path is deprecated).
+- [ ] **Corpus and database are fetched via `scripts/fetch_data_sources.py`.** The script tries this repo's `data-mirror-v1` GitHub release first (durable for this repo's lifetime) and falls back to the upstream langchain-ai GCS bucket, verifying SHA-256 against pinned constants before writing. It's idempotent — skip the download if the local hashes match.
+  - `python scripts/fetch_data_sources.py`
+  - Sources: `corpus/swiss_faq.md` (35,061 B) and `data/travel.sqlite` (114,442,240 B — upstream is `travel2.sqlite`, normalised). Pinned hashes are in the script's `SOURCES` constant. Mirror provenance is recorded in the release notes; see issue #19.
+- [ ] For tutorial context, see the current LangGraph docs at `https://docs.langchain.com/oss/python/langgraph/overview`. The original customer-support notebook path (`langchain-ai/langgraph` → `docs/docs/tutorials/customer-support/customer-support.ipynb`) was deprecated when the docs were restructured and now returns 404; the original notebook is preserved in git history at that path.
 - [ ] Read `swiss_faq.md` to inventory the actual policy classes present (count them, note vocabulary). This affects task design (Phase 2 Step 4) and implementation choices for Naive RAG, Grep search, and Hybrid RAG.
 - [ ] Inspect `travel.sqlite` schema (tables, columns, row counts, sample data)
 - [ ] Document findings in a brief `notebooks/00_corpus_inventory.ipynb` — what we're working with. Record the source URLs verbatim so future reproducers have a fixed starting point.
 
 This step exists because we've been treating the LangGraph tutorial as a placeholder. Extracting the actual artifacts surfaces design constraints we haven't anticipated and confirms what we're actually measuring against.
 
-If the GCS URLs ever become unavailable, the canonical source is the LangGraph tutorial notebook's `db.py` setup cell, which encodes both the URL pattern and the underlying SQL fallback.
+If both the `data-mirror-v1` release and the upstream GCS bucket become unavailable, the canonical source is the LangGraph tutorial notebook's `db.py` setup cell (preserved in git history at the deprecated path above), which encodes both the URL pattern and the underlying SQL fallback.
 
 ### Step 1: Project setup
 
