@@ -6,6 +6,7 @@ Mocked unit tests cover:
   · run_smoke gate behavior (pass + fail paths)
   · --report flag against fixture result files
   · architecture registry dispatch
+  · run_measurement orchestration (alternating order, retry, gate, JSON shape)
 
 Real-API smoke run is in `pytest --run-live-api -m live_api` territory;
 this file tests the orchestration logic, not the live behavior.
@@ -17,6 +18,26 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
+
+@pytest.fixture
+def clean_registry():
+    """Snapshot ARCHITECTURE_REGISTRY before a test and restore after.
+
+    Tests that inject fake architectures (or assert post-import state)
+    must not leak registrations into sibling tests — the real agent
+    modules register themselves at import time and we want a clean slate
+    around each manipulation.
+    """
+    from measurement.runner import ARCHITECTURE_REGISTRY
+
+    before = dict(ARCHITECTURE_REGISTRY)
+    ARCHITECTURE_REGISTRY.clear()
+    try:
+        yield ARCHITECTURE_REGISTRY
+    finally:
+        ARCHITECTURE_REGISTRY.clear()
+        ARCHITECTURE_REGISTRY.update(before)
 
 
 # =========================================================================
@@ -62,6 +83,14 @@ class TestParseArgs:
 
         args = parse_args(["--tasks", "measurement/tasks.jsonl"])
         assert args.tasks == Path("measurement/tasks.jsonl")
+
+    def test_limit_arg(self):
+        from measurement.runner import parse_args
+
+        args = parse_args(["--limit", "1"])
+        assert args.limit == 1
+        # Default is None — full task set.
+        assert parse_args([]).limit is None
 
 
 # =========================================================================
@@ -287,3 +316,472 @@ class TestMain:
         assert exit_code != 0
         err = capsys.readouterr().err
         assert "Usage" in err or "usage" in err
+
+
+# =========================================================================
+# Full measurement run (--architectures dispatch path)
+# =========================================================================
+
+
+def _good_record(arch: str, task_id: str, *, api_input: int = 1500) -> dict:
+    """A minimal record_run-shaped dict the runner is comfortable with.
+
+    Mirrors what `architectures._shared.agent_loop.run_task` returns:
+    decomposition with all six categories, decomposition_input_sum
+    (audit-excluded), decomposition_input_sum_with_audit (audit-included,
+    matches api_input_tokens for a clean gate pass).
+    """
+    decomposition = {
+        "system_prompt": 500,
+        "retrieved_context": 700,
+        "user_message": 50,
+        "tool_overhead": 200,
+        "agent_intermediate": 50,
+        "response": 200,
+    }
+    inclusive = sum(decomposition[k] for k in decomposition if k != "response")
+    return {
+        "architecture": arch,
+        "task_id": task_id,
+        "decomposition": decomposition,
+        "decomposition_input_sum": inclusive,
+        "decomposition_input_sum_with_audit": api_input,
+        "api_input_tokens": api_input,
+        "api_output_tokens": 200,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "response_text": "ok",
+        "turns": 2,
+        "tools_called": ["vector_search", "audit_log"],
+        "audit_log_tokens_in_retrieved_context": 0,
+        "audit_log_tokens_in_agent_intermediate": 0,
+    }
+
+
+def _write_tasks_file(tmp_path: Path, tasks: list[dict]) -> Path:
+    """JSONL with a leading comment line, mirroring the real tasks.jsonl."""
+    lines = ["# COMPLETE — frozen for test."]
+    lines.extend(json.dumps(t) for t in tasks)
+    path = tmp_path / "tasks.jsonl"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+class TestLoadTasks:
+    def test_skips_comments_and_blank_lines(self, tmp_path):
+        from measurement.runner import _load_tasks
+
+        path = tmp_path / "tasks.jsonl"
+        path.write_text(
+            "# header comment\n"
+            "\n"
+            '{"task_id": "T1", "user_message": "hi"}\n'
+            "  \n"
+            '{"task_id": "T2", "user_message": "bye"}\n'
+        )
+        tasks = _load_tasks(path)
+        assert [t["task_id"] for t in tasks] == ["T1", "T2"]
+
+
+class TestLoadArchitectures:
+    def test_uses_pre_registered_fakes_without_importing(self, clean_registry):
+        from measurement.runner import _load_architectures, register_architecture
+
+        sentinel = lambda *a, **k: None  # noqa: E731
+        register_architecture("fake_arch", sentinel)
+
+        resolved = _load_architectures(["fake_arch"])
+        assert resolved == {"fake_arch": sentinel}
+
+    def test_unknown_architecture_raises(self, clean_registry):
+        from measurement.runner import _load_architectures
+
+        with pytest.raises(RuntimeError, match="not found"):
+            _load_architectures(["does_not_exist_arch"])
+
+
+class TestRunMeasurementOrder:
+    def test_alternates_archs_per_task(self, tmp_path, clean_registry):
+        """METHODOLOGY §"Run protocol": for each task within a run pass,
+        every architecture dispatches before moving to the next task.
+        """
+        from measurement.runner import register_architecture, run_measurement
+
+        order: list[tuple[str, str, int]] = []
+
+        def make_fn(name):
+            counter = {"i": 0}
+
+            def fn(task, *, client=None):
+                rec = _good_record(name, task["task_id"])
+                order.append((name, task["task_id"], counter["i"]))
+                counter["i"] += 1
+                return rec
+
+            return fn
+
+        register_architecture("arch_a", make_fn("arch_a"))
+        register_architecture("arch_b", make_fn("arch_b"))
+
+        tasks_path = _write_tasks_file(
+            tmp_path,
+            [
+                {"task_id": "T1", "user_message": "q1"},
+                {"task_id": "T2", "user_message": "q2"},
+            ],
+        )
+        results_dir = tmp_path / "results"
+        exit_code = run_measurement(
+            architectures=["arch_a", "arch_b"],
+            tasks_path=tasks_path,
+            runs=2,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+        assert exit_code == 0
+        # Run 1: T1-a, T1-b, T2-a, T2-b. Run 2: same. Eight total dispatches.
+        names_in_order = [n for n, _, _ in order]
+        assert names_in_order == [
+            "arch_a", "arch_b",
+            "arch_a", "arch_b",
+            "arch_a", "arch_b",
+            "arch_a", "arch_b",
+        ]
+        task_in_order = [t for _, t, _ in order]
+        assert task_in_order == ["T1", "T1", "T2", "T2", "T1", "T1", "T2", "T2"]
+
+
+class TestRunMeasurementOutput:
+    def test_writes_one_json_per_architecture_with_runs(
+        self, tmp_path, clean_registry
+    ):
+        from measurement.runner import register_architecture, run_measurement
+
+        register_architecture(
+            "arch_a", lambda task, **_: _good_record("arch_a", task["task_id"])
+        )
+        register_architecture(
+            "arch_b", lambda task, **_: _good_record("arch_b", task["task_id"])
+        )
+
+        tasks_path = _write_tasks_file(
+            tmp_path, [{"task_id": "T1", "user_message": "q"}]
+        )
+        results_dir = tmp_path / "results"
+        run_measurement(
+            architectures=["arch_a", "arch_b"],
+            tasks_path=tasks_path,
+            runs=3,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+
+        for arch in ("arch_a", "arch_b"):
+            path = results_dir / f"architecture_{arch}.json"
+            assert path.exists()
+            payload = json.loads(path.read_text())
+            assert payload["architecture"] == arch
+            assert payload["config"]["runs_per_task"] == 3
+            assert payload["config"]["tasks_count"] == 1
+            assert len(payload["runs"]) == 3  # 1 task × 3 runs
+            assert payload["errors"] == []
+            run0 = payload["runs"][0]
+            assert run0["run_index"] == 0
+            assert run0["task_id"] == "T1"
+            assert "gate_ratio" in run0
+            assert run0["gate_breach"] is False
+
+    def test_output_round_trips_into_report(self, tmp_path, clean_registry):
+        """The per-architecture JSON the run produces is the same shape
+        `--report` consumes. Catches the easy mistake of changing the
+        record schema in one place without the other.
+        """
+        from measurement.runner import (
+            generate_report,
+            register_architecture,
+            run_measurement,
+        )
+
+        register_architecture(
+            "arch_a", lambda task, **_: _good_record("arch_a", task["task_id"])
+        )
+        tasks_path = _write_tasks_file(
+            tmp_path, [{"task_id": "T1", "user_message": "q"}]
+        )
+        results_dir = tmp_path / "results"
+        run_measurement(
+            architectures=["arch_a"],
+            tasks_path=tasks_path,
+            runs=2,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+        exit_code = generate_report(
+            results_dir=results_dir, output_path=results_dir / "comparison.md"
+        )
+        assert exit_code == 0
+        report = (results_dir / "comparison.md").read_text()
+        assert "arch_a" in report
+
+
+class TestRunMeasurementRetry:
+    def test_retries_transient_error_and_succeeds(self, tmp_path, clean_registry):
+        from measurement.runner import register_architecture, run_measurement
+
+        attempts = {"n": 0}
+
+        def flaky(task, **_):
+            attempts["n"] += 1
+            if attempts["n"] < 2:
+                raise RuntimeError("transient API blip")
+            return _good_record("flaky", task["task_id"])
+
+        register_architecture("flaky", flaky)
+        tasks_path = _write_tasks_file(
+            tmp_path, [{"task_id": "T1", "user_message": "q"}]
+        )
+        results_dir = tmp_path / "results"
+        run_measurement(
+            architectures=["flaky"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+        payload = json.loads(
+            (results_dir / "architecture_flaky.json").read_text()
+        )
+        assert len(payload["runs"]) == 1
+        assert payload["runs"][0]["attempts"] == 2
+        assert payload["errors"] == []
+
+    def test_records_error_after_exhausted_retries(self, tmp_path, clean_registry):
+        """METHODOLOGY §"Run protocol": initial attempt + 2 retries.
+        After three failures the task is flagged for that run, and the
+        per-arch JSON preserves enough exception detail to triage
+        without digging through stderr capture (PR #41 review)."""
+        from measurement.runner import register_architecture, run_measurement
+
+        def always_fails(task, **_):
+            raise RuntimeError("persistent failure")
+
+        register_architecture("dead", always_fails)
+        tasks_path = _write_tasks_file(
+            tmp_path, [{"task_id": "T1", "user_message": "q"}]
+        )
+        results_dir = tmp_path / "results"
+        run_measurement(
+            architectures=["dead"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+        payload = json.loads(
+            (results_dir / "architecture_dead.json").read_text()
+        )
+        assert payload["runs"] == []
+        assert len(payload["errors"]) == 1
+        err = payload["errors"][0]
+        assert err["task_id"] == "T1"
+        assert err["attempts"] == 3  # initial + 2 retries
+        assert err["error_type"] == "RuntimeError"
+        assert err["error_message"] == "persistent failure"
+
+
+class TestRunMeasurementGate:
+    def test_gate_breach_flagged_not_silenced(self, tmp_path, clean_registry, capsys):
+        """CLAUDE.md invariant: runner asserts the 5% gate and flags
+        discrepancies; do not silence."""
+        from measurement.runner import register_architecture, run_measurement
+
+        def bad_record(task, **_):
+            rec = _good_record("breachy", task["task_id"], api_input=2000)
+            # Sum-with-audit is 1500; API is 2000 → 25% gap.
+            rec["decomposition_input_sum_with_audit"] = 1500
+            return rec
+
+        register_architecture("breachy", bad_record)
+        tasks_path = _write_tasks_file(
+            tmp_path, [{"task_id": "T1", "user_message": "q"}]
+        )
+        results_dir = tmp_path / "results"
+        run_measurement(
+            architectures=["breachy"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+        payload = json.loads(
+            (results_dir / "architecture_breachy.json").read_text()
+        )
+        run0 = payload["runs"][0]
+        assert run0["gate_breach"] is True
+        assert run0["gate_ratio"] >= 0.05
+        # Breach is also surfaced on stderr — flagged, not silent.
+        err = capsys.readouterr().err
+        assert "gate-breach" in err
+
+
+class TestRunMeasurementCheckpoint:
+    """PR #41 review #3: the full paid run (~150+ calls) should not lose
+    everything to an interruption. After every dispatch, the per-arch
+    JSON on disk should reflect records produced so far.
+    """
+
+    def test_arch_json_exists_mid_run_with_prior_records(
+        self, tmp_path, clean_registry
+    ):
+        from measurement.runner import register_architecture, run_measurement
+
+        results_dir = tmp_path / "results"
+        observed_states: list[dict] = []
+
+        def make_fn(arch_name):
+            def fn(task, **_):
+                # Snapshot whichever arch files exist *before* this
+                # dispatch's write. After T1 completes, dispatching T2
+                # should see T1's record already on disk.
+                snapshot: dict = {}
+                for p in sorted(results_dir.glob("architecture_*.json")):
+                    payload = json.loads(p.read_text())
+                    snapshot[payload["architecture"]] = [
+                        r["task_id"] for r in payload["runs"]
+                    ]
+                observed_states.append(
+                    {"current": (arch_name, task["task_id"]), "on_disk": snapshot}
+                )
+                return _good_record(arch_name, task["task_id"])
+
+            return fn
+
+        register_architecture("arch_a", make_fn("arch_a"))
+        register_architecture("arch_b", make_fn("arch_b"))
+        tasks_path = _write_tasks_file(
+            tmp_path,
+            [
+                {"task_id": "T1", "user_message": "q1"},
+                {"task_id": "T2", "user_message": "q2"},
+            ],
+        )
+        run_measurement(
+            architectures=["arch_a", "arch_b"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+
+        # When arch_a is dispatched on T2, arch_a's file should already
+        # carry T1's record on disk — proof of mid-run checkpointing.
+        t2_a_state = next(
+            s for s in observed_states if s["current"] == ("arch_a", "T2")
+        )
+        assert "arch_a" in t2_a_state["on_disk"]
+        assert t2_a_state["on_disk"]["arch_a"] == ["T1"]
+
+    def test_completed_at_only_populated_at_end(self, tmp_path, clean_registry):
+        """While the run is in progress the on-disk config.completed_at
+        is null; only the post-loop final write fills it in. Lets a
+        post-mortem distinguish a clean run from an interrupted one.
+        """
+        from measurement.runner import register_architecture, run_measurement
+
+        results_dir = tmp_path / "results"
+        mid_run_completed_at: list = []
+
+        def fn(task, **_):
+            for p in results_dir.glob("architecture_*.json"):
+                payload = json.loads(p.read_text())
+                mid_run_completed_at.append(payload["config"]["completed_at"])
+            return _good_record("ck", task["task_id"])
+
+        register_architecture("ck", fn)
+        tasks_path = _write_tasks_file(
+            tmp_path,
+            [
+                {"task_id": "T1", "user_message": "q1"},
+                {"task_id": "T2", "user_message": "q2"},
+            ],
+        )
+        run_measurement(
+            architectures=["ck"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+
+        # During T2 dispatch, T1's checkpoint already exists with
+        # completed_at == None. After the full run the final file has a
+        # populated completed_at.
+        assert None in mid_run_completed_at
+        final = json.loads(
+            (results_dir / "architecture_ck.json").read_text()
+        )
+        assert final["config"]["completed_at"] is not None
+
+
+class TestRunMeasurementLimit:
+    def test_limit_truncates_task_set(self, tmp_path, clean_registry):
+        from measurement.runner import register_architecture, run_measurement
+
+        seen: list[str] = []
+
+        def arch(task, **_):
+            seen.append(task["task_id"])
+            return _good_record("trunc", task["task_id"])
+
+        register_architecture("trunc", arch)
+        tasks_path = _write_tasks_file(
+            tmp_path,
+            [
+                {"task_id": "T1", "user_message": "q1"},
+                {"task_id": "T2", "user_message": "q2"},
+                {"task_id": "T3", "user_message": "q3"},
+            ],
+        )
+        run_measurement(
+            architectures=["trunc"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=tmp_path / "results",
+            limit=1,
+            client=MagicMock(),
+        )
+        assert seen == ["T1"]
+
+
+class TestMainArchitecturesDispatch:
+    def test_main_routes_architectures_to_run_measurement(
+        self, tmp_path, monkeypatch
+    ):
+        """main() with --architectures must dispatch to run_measurement
+        and not the old Phase-2 stub message."""
+        from measurement import runner
+
+        called: dict = {}
+
+        def fake_run_measurement(**kwargs):
+            called.update(kwargs)
+            return 0
+
+        monkeypatch.setattr(runner, "run_measurement", fake_run_measurement)
+        tasks_path = tmp_path / "tasks.jsonl"
+        tasks_path.write_text('{"task_id":"T","user_message":"q"}\n')
+
+        exit_code = runner.main(
+            [
+                "--architectures", "naive_rag,grep_search",
+                "--tasks", str(tasks_path),
+                "--runs", "1",
+                "--limit", "1",
+                "--results-dir", str(tmp_path / "results"),
+            ]
+        )
+        assert exit_code == 0
+        assert called["architectures"] == ["naive_rag", "grep_search"]
+        assert called["tasks_path"] == tasks_path
+        assert called["runs"] == 1
+        assert called["limit"] == 1
