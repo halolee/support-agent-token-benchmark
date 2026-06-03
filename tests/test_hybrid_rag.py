@@ -190,13 +190,18 @@ class TestHybridSearchBounds:
     def test_vector_topk_tolerates_explicit_none_in_chromadb_response(
         self, monkeypatch
     ):
-        """Issue #34: ChromaDB returns parallel-array keys (ids, documents,
-        metadatas, distances) but their *values* can be None — e.g., if a
-        future refactor adds `include=['documents']` to the query call,
-        metadatas is None, not absent. `raw.get("metadatas", [[]])[0]`
-        would then crash with TypeError since `None[0]` is unsubscriptable.
-        Verify the `(raw.get(...) or [[]])[0]` guard handles both
-        missing-key and present-but-None uniformly.
+        """Issue #34 + Codex PR #40 review: ChromaDB returns parallel-array
+        keys (ids, documents, metadatas) but their *values* can be None —
+        e.g., a future `include=['documents']` optimisation drops
+        metadata to save bytes. `raw.get("metadatas", [[]])[0]` crashed
+        with TypeError because `None[0]` is unsubscriptable.
+
+        The fix: (1) `(raw.get(...) or [[]])[0]` collapses missing-key
+        and present-but-None uniformly; (2) pad parallel arrays to
+        len(ids) so populated ids/documents aren't silently dropped by
+        zip() when metadatas comes back shorter — the vector side of
+        RRF would otherwise go dark instead of contributing chunks with
+        blank citation metadata.
         """
         from architectures.hybrid_rag import tools
 
@@ -210,22 +215,26 @@ class TestHybridSearchBounds:
 
         class _StubCollection:
             def query(self, **kwargs):
-                # Realistic ChromaDB-with-include-narrowing shape: ids
-                # and documents populated, metadatas explicitly None.
+                # Realistic include=['documents'] shape: ids + documents
+                # populated, metadatas explicitly None.
                 return {
-                    "ids": [["a"]],
-                    "documents": [["alpha-text"]],
+                    "ids": [["a", "b"]],
+                    "documents": [["alpha-text", "beta-text"]],
                     "metadatas": None,
                 }
 
         monkeypatch.setattr(tools, "_get_embedding_model", lambda: _StubModel())
         monkeypatch.setattr(tools, "_get_collection", lambda: _StubCollection())
 
-        # Must not raise. Result is empty because zip() over the empty
-        # metadatas list yields no rows — that's acceptable silent
-        # degradation; the crash was the bug.
         result = tools._vector_topk("anything", 5)
-        assert result == []
+        # Both hits preserved (not silently zip-truncated); metadata
+        # padded to blanks so the agent can still see the chunk text.
+        assert len(result) == 2
+        assert [r["chunk_id"] for r in result] == ["a", "b"]
+        assert [r["text"] for r in result] == ["alpha-text", "beta-text"]
+        # Metadata fields surface as None rather than vanishing entirely.
+        assert all(r["section_id"] is None for r in result)
+        assert all(r["section_title"] is None for r in result)
 
     def test_hybrid_search_coerces_non_int_k_to_default(self, monkeypatch):
         """Schema declares k as integer but the Anthropic SDK forwards

@@ -118,6 +118,19 @@ def vector_search(query: str, k: int = DEFAULT_K) -> dict[str, Any]:
     documents = (raw.get("documents") or [[]])[0]
     metadatas = (raw.get("metadatas") or [[]])[0]
     distances = (raw.get("distances") or [[None] * len(ids)])[0]
+    # Pad parallel arrays to len(ids) — a present-but-None metadatas
+    # response (e.g., a future `include=['documents']` optimisation
+    # that drops metadata to save bytes) shouldn't silently drop all
+    # retrieved chunks via zip(). Returned chunks lose citation
+    # metadata in that scenario, which is surfaceable downstream
+    # rather than invisible. See Codex review on PR #40.
+    n = len(ids)
+    if len(documents) < n:
+        documents = list(documents) + [""] * (n - len(documents))
+    if len(metadatas) < n:
+        metadatas = list(metadatas) + [{}] * (n - len(metadatas))
+    if len(distances) < n:
+        distances = list(distances) + [None] * (n - len(distances))
 
     for chunk_id, text, meta, dist in zip(ids, documents, metadatas, distances):
         chunks.append(

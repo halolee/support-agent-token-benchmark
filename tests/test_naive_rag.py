@@ -151,13 +151,17 @@ class TestVectorSearchBounds:
     def test_vector_search_tolerates_explicit_none_in_chromadb_response(
         self, monkeypatch
     ):
-        """Issue #34: ChromaDB returns parallel-array keys (ids, documents,
-        metadatas, distances) but their *values* can be None — e.g., if a
-        future refactor adds `include=['documents']` to the query call,
-        metadatas is None, not absent. `raw.get("metadatas", [[]])[0]`
-        would then crash with TypeError since `None[0]` is unsubscriptable.
-        Verify the `(raw.get(...) or [[]])[0]` guard handles both
-        missing-key and present-but-None uniformly.
+        """Issue #34 + Codex PR #40 review: ChromaDB returns parallel-array
+        keys (ids, documents, metadatas, distances) but their *values*
+        can be None — e.g., a future `include=['documents']` optimisation
+        drops metadata to save bytes. `raw.get("metadatas", [[]])[0]`
+        crashed with TypeError because `None[0]` is unsubscriptable.
+
+        The fix: (1) `(raw.get(...) or [[]])[0]` collapses missing-key
+        and present-but-None uniformly; (2) pad parallel arrays to
+        len(ids) so populated ids/documents aren't silently dropped by
+        zip() when metadatas/distances come back shorter — Naive RAG
+        would otherwise return zero chunks despite retrieval succeeding.
         """
         from architectures.naive_rag import tools
 
@@ -172,8 +176,8 @@ class TestVectorSearchBounds:
         class _StubCollection:
             def query(self, **kwargs):
                 return {
-                    "ids": [["a"]],
-                    "documents": [["alpha-text"]],
+                    "ids": [["a", "b"]],
+                    "documents": [["alpha-text", "beta-text"]],
                     "metadatas": None,
                     "distances": None,
                 }
@@ -181,10 +185,16 @@ class TestVectorSearchBounds:
         monkeypatch.setattr(tools, "_get_embedding_model", lambda: _StubModel())
         monkeypatch.setattr(tools, "_get_collection", lambda: _StubCollection())
 
-        # Must not raise. Empty chunks list is acceptable silent
-        # degradation; the crash was the bug.
         result = tools.vector_search("anything", k=5)
-        assert result["chunks"] == []
+        # Both hits preserved (not silently zip-truncated); metadata
+        # and distance fields padded so the agent still sees the chunks.
+        chunks = result["chunks"]
+        assert len(chunks) == 2
+        assert [c["chunk_id"] for c in chunks] == ["a", "b"]
+        assert [c["text"] for c in chunks] == ["alpha-text", "beta-text"]
+        assert all(c["section_id"] is None for c in chunks)
+        assert all(c["section_title"] is None for c in chunks)
+        assert all(c["distance"] is None for c in chunks)
 
     @pytest.mark.slow
     def test_returns_chunks_with_citation_metadata(self):

@@ -178,6 +178,17 @@ def _vector_topk(query: str, k: int) -> list[dict[str, Any]]:
     ids = (raw.get("ids") or [[]])[0]
     documents = (raw.get("documents") or [[]])[0]
     metadatas = (raw.get("metadatas") or [[]])[0]
+    # Pad parallel arrays to len(ids) — a present-but-None metadatas
+    # response (e.g., a future `include=['documents']` optimisation
+    # that drops metadata to save bytes) shouldn't silently drop the
+    # vector side of RRF via zip(). Returned chunks lose citation
+    # metadata in that scenario, which is surfaceable downstream
+    # rather than invisible. See Codex review on PR #40.
+    n = len(ids)
+    if len(documents) < n:
+        documents = list(documents) + [""] * (n - len(documents))
+    if len(metadatas) < n:
+        metadatas = list(metadatas) + [{}] * (n - len(metadatas))
     out: list[dict[str, Any]] = []
     for chunk_id, text, meta in zip(ids, documents, metadatas):
         out.append(
