@@ -256,11 +256,14 @@ def _dispatch_one(
     arch_name: str,
     run_index: int,
     runs_total: int,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Run a single (arch, task) pair with retry per METHODOLOGY.
 
-    Returns the record dict on success or None if all attempts failed
-    (the caller logs the error to the per-architecture error list).
+    Returns `(record, None)` on success or `(None, error)` after exhausted
+    retries. The error dict preserves the exception's class name and
+    message so the per-architecture JSON keeps enough forensic detail to
+    distinguish (e.g.) a rate-limit transient from a deterministic bug
+    without having to dig through stderr capture — see PR #41 review.
     """
     last_exc: Exception | None = None
     attempts = 0
@@ -299,7 +302,7 @@ def _dispatch_one(
             f"output={record['api_output_tokens']} "
             f"gate={ratio:.1%}"
         )
-        return record
+        return record, None
     # Exhausted retries.
     print(
         f"[fail] arch={arch_name} task={task['task_id']} "
@@ -307,7 +310,39 @@ def _dispatch_one(
         f"{type(last_exc).__name__}: {last_exc}",
         file=sys.stderr,
     )
-    return None
+    return None, {
+        "task_id": task["task_id"],
+        "run_index": run_index,
+        "attempts": attempts,
+        "error_type": type(last_exc).__name__ if last_exc else "Unknown",
+        "error_message": str(last_exc) if last_exc else "",
+    }
+
+
+def _write_arch_json(
+    *,
+    path: Path,
+    architecture: str,
+    config: dict[str, Any],
+    runs: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+) -> None:
+    """Write `architecture_<name>.json` to a sibling .tmp then rename.
+
+    Called after every dispatch (not just at end-of-run) so an
+    interruption mid-paid-run keeps the records produced so far. The
+    tmp+rename gives atomic-enough writes on POSIX — a reader either
+    sees the previous full file or the new full file, not a torn one.
+    """
+    payload = {
+        "architecture": architecture,
+        "config": config,
+        "runs": runs,
+        "errors": errors,
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n")
+    tmp.replace(path)
 
 
 def run_measurement(
@@ -326,17 +361,26 @@ def run_measurement(
     architecture back-to-back before moving to the next task.
 
     Output: one `architecture_<name>.json` per architecture in
-    `results_dir`, shape compatible with `--report` aggregation:
+    `results_dir`, rewritten after every successful dispatch (atomic via
+    tmp+rename) so an interruption mid-run keeps the records produced so
+    far. Shape compatible with `--report` aggregation:
         {
           "architecture": <name>,
-          "config": {...},
+          "config": {..., "completed_at": null until end-of-run},
           "runs": [<record_run dict with run_index/gate_ratio/etc>, ...],
-          "errors": [{"task_id", "run_index", "type", "error", "attempts"}, ...]
+          "errors": [
+              {"task_id", "run_index", "attempts",
+               "error_type", "error_message"},
+              ...
+          ]
         }
 
     Returns 0 on completion (even if some runs hit the gate or errored —
-    those are flagged in the records). Returns 1 only on systemic failure
-    (no tasks, unresolvable architecture).
+    those are flagged in the records and errors list). Returns 1 only on
+    no-tasks. An unresolvable architecture is a misconfigured CLI
+    invocation; `_load_architectures` raises `RuntimeError` so the
+    operator sees the failure immediately rather than after a normal-
+    looking exit.
     """
     if client is None:
         client = anthropic.Anthropic()
@@ -353,6 +397,17 @@ def run_measurement(
     per_arch_errors: dict[str, list[dict[str, Any]]] = {n: [] for n in architectures}
     breach_count = 0
     started_at = datetime.now(timezone.utc).isoformat()
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    def _config(completed_at: str | None) -> dict[str, Any]:
+        return {
+            "tasks_path": str(tasks_path),
+            "tasks_count": len(tasks),
+            "runs_per_task": runs,
+            "limit": limit,
+            "started_at": started_at,
+            "completed_at": completed_at,
+        }
 
     total_calls = runs * len(tasks) * len(architectures)
     print(
@@ -361,10 +416,15 @@ def run_measurement(
         file=sys.stderr,
     )
 
+    arch_paths = {
+        arch: results_dir / f"architecture_{arch}.json"
+        for arch in architectures
+    }
+
     for run_index in range(runs):
         for task in tasks:
             for arch in architectures:
-                record = _dispatch_one(
+                record, error = _dispatch_one(
                     arch_fn=arch_fns[arch],
                     task=task,
                     client=client,
@@ -372,39 +432,34 @@ def run_measurement(
                     run_index=run_index,
                     runs_total=runs,
                 )
-                if record is None:
-                    per_arch_errors[arch].append(
-                        {
-                            "task_id": task["task_id"],
-                            "run_index": run_index,
-                            "attempts": _MAX_RETRIES + 1,
-                        }
-                    )
-                    continue
-                if record["gate_breach"]:
-                    breach_count += 1
-                per_arch_runs[arch].append(record)
+                if error is not None:
+                    per_arch_errors[arch].append(error)
+                else:
+                    if record["gate_breach"]:
+                        breach_count += 1
+                    per_arch_runs[arch].append(record)
+                # Checkpoint after every dispatch: an interrupted paid run
+                # (e.g., SIGINT at call ~150 of ~150) keeps the records
+                # produced so far instead of losing the entire sweep.
+                _write_arch_json(
+                    path=arch_paths[arch],
+                    architecture=arch,
+                    config=_config(completed_at=None),
+                    runs=per_arch_runs[arch],
+                    errors=per_arch_errors[arch],
+                )
 
     completed_at = datetime.now(timezone.utc).isoformat()
-    results_dir.mkdir(parents=True, exist_ok=True)
     for arch in architectures:
-        path = results_dir / f"architecture_{arch}.json"
-        payload = {
-            "architecture": arch,
-            "config": {
-                "tasks_path": str(tasks_path),
-                "tasks_count": len(tasks),
-                "runs_per_task": runs,
-                "limit": limit,
-                "started_at": started_at,
-                "completed_at": completed_at,
-            },
-            "runs": per_arch_runs[arch],
-            "errors": per_arch_errors[arch],
-        }
-        path.write_text(json.dumps(payload, indent=2) + "\n")
+        _write_arch_json(
+            path=arch_paths[arch],
+            architecture=arch,
+            config=_config(completed_at=completed_at),
+            runs=per_arch_runs[arch],
+            errors=per_arch_errors[arch],
+        )
         print(
-            f"Wrote {path}: "
+            f"Wrote {arch_paths[arch]}: "
             f"{len(per_arch_runs[arch])} runs, "
             f"{len(per_arch_errors[arch])} errors."
         )

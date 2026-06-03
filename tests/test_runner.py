@@ -557,7 +557,9 @@ class TestRunMeasurementRetry:
 
     def test_records_error_after_exhausted_retries(self, tmp_path, clean_registry):
         """METHODOLOGY §"Run protocol": initial attempt + 2 retries.
-        After three failures the task is flagged for that run."""
+        After three failures the task is flagged for that run, and the
+        per-arch JSON preserves enough exception detail to triage
+        without digging through stderr capture (PR #41 review)."""
         from measurement.runner import register_architecture, run_measurement
 
         def always_fails(task, **_):
@@ -583,6 +585,8 @@ class TestRunMeasurementRetry:
         err = payload["errors"][0]
         assert err["task_id"] == "T1"
         assert err["attempts"] == 3  # initial + 2 retries
+        assert err["error_type"] == "RuntimeError"
+        assert err["error_message"] == "persistent failure"
 
 
 class TestRunMeasurementGate:
@@ -618,6 +622,105 @@ class TestRunMeasurementGate:
         # Breach is also surfaced on stderr — flagged, not silent.
         err = capsys.readouterr().err
         assert "gate-breach" in err
+
+
+class TestRunMeasurementCheckpoint:
+    """PR #41 review #3: the full paid run (~150+ calls) should not lose
+    everything to an interruption. After every dispatch, the per-arch
+    JSON on disk should reflect records produced so far.
+    """
+
+    def test_arch_json_exists_mid_run_with_prior_records(
+        self, tmp_path, clean_registry
+    ):
+        from measurement.runner import register_architecture, run_measurement
+
+        results_dir = tmp_path / "results"
+        observed_states: list[dict] = []
+
+        def make_fn(arch_name):
+            def fn(task, **_):
+                # Snapshot whichever arch files exist *before* this
+                # dispatch's write. After T1 completes, dispatching T2
+                # should see T1's record already on disk.
+                snapshot: dict = {}
+                for p in sorted(results_dir.glob("architecture_*.json")):
+                    payload = json.loads(p.read_text())
+                    snapshot[payload["architecture"]] = [
+                        r["task_id"] for r in payload["runs"]
+                    ]
+                observed_states.append(
+                    {"current": (arch_name, task["task_id"]), "on_disk": snapshot}
+                )
+                return _good_record(arch_name, task["task_id"])
+
+            return fn
+
+        register_architecture("arch_a", make_fn("arch_a"))
+        register_architecture("arch_b", make_fn("arch_b"))
+        tasks_path = _write_tasks_file(
+            tmp_path,
+            [
+                {"task_id": "T1", "user_message": "q1"},
+                {"task_id": "T2", "user_message": "q2"},
+            ],
+        )
+        run_measurement(
+            architectures=["arch_a", "arch_b"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+
+        # When arch_a is dispatched on T2, arch_a's file should already
+        # carry T1's record on disk — proof of mid-run checkpointing.
+        t2_a_state = next(
+            s for s in observed_states if s["current"] == ("arch_a", "T2")
+        )
+        assert "arch_a" in t2_a_state["on_disk"]
+        assert t2_a_state["on_disk"]["arch_a"] == ["T1"]
+
+    def test_completed_at_only_populated_at_end(self, tmp_path, clean_registry):
+        """While the run is in progress the on-disk config.completed_at
+        is null; only the post-loop final write fills it in. Lets a
+        post-mortem distinguish a clean run from an interrupted one.
+        """
+        from measurement.runner import register_architecture, run_measurement
+
+        results_dir = tmp_path / "results"
+        mid_run_completed_at: list = []
+
+        def fn(task, **_):
+            for p in results_dir.glob("architecture_*.json"):
+                payload = json.loads(p.read_text())
+                mid_run_completed_at.append(payload["config"]["completed_at"])
+            return _good_record("ck", task["task_id"])
+
+        register_architecture("ck", fn)
+        tasks_path = _write_tasks_file(
+            tmp_path,
+            [
+                {"task_id": "T1", "user_message": "q1"},
+                {"task_id": "T2", "user_message": "q2"},
+            ],
+        )
+        run_measurement(
+            architectures=["ck"],
+            tasks_path=tasks_path,
+            runs=1,
+            results_dir=results_dir,
+            client=MagicMock(),
+        )
+
+        # During T2 dispatch, T1's checkpoint already exists with
+        # completed_at == None. After the full run the final file has a
+        # populated completed_at.
+        assert None in mid_run_completed_at
+        final = json.loads(
+            (results_dir / "architecture_ck.json").read_text()
+        )
+        assert final["config"]["completed_at"] is not None
 
 
 class TestRunMeasurementLimit:
