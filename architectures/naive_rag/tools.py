@@ -108,10 +108,16 @@ def vector_search(query: str, k: int = DEFAULT_K) -> dict[str, Any]:
     )
 
     chunks: list[dict[str, Any]] = []
-    ids = raw.get("ids", [[]])[0]
-    documents = raw.get("documents", [[]])[0]
-    metadatas = raw.get("metadatas", [[]])[0]
-    distances = raw.get("distances", [[]])[0] if raw.get("distances") else [None] * len(ids)
+    # `dict.get(key, default)` returns the *stored value* when key is
+    # present, even when that value is None — ChromaDB's query response
+    # can include parallel-array keys with value None (e.g., metadatas
+    # is None when `include` is set to exclude it). The `or [[]]` guard
+    # handles both missing-key and present-but-None cases uniformly. See
+    # issue #34.
+    ids = (raw.get("ids") or [[]])[0]
+    documents = (raw.get("documents") or [[]])[0]
+    metadatas = (raw.get("metadatas") or [[]])[0]
+    distances = (raw.get("distances") or [[None] * len(ids)])[0]
 
     for chunk_id, text, meta, dist in zip(ids, documents, metadatas, distances):
         chunks.append(

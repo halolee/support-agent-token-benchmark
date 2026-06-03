@@ -187,6 +187,46 @@ class TestHybridSearchBounds:
         assert result["k"] == tools._K_CEILING
         assert len(result["chunks"]) <= tools._K_CEILING
 
+    def test_vector_topk_tolerates_explicit_none_in_chromadb_response(
+        self, monkeypatch
+    ):
+        """Issue #34: ChromaDB returns parallel-array keys (ids, documents,
+        metadatas, distances) but their *values* can be None — e.g., if a
+        future refactor adds `include=['documents']` to the query call,
+        metadatas is None, not absent. `raw.get("metadatas", [[]])[0]`
+        would then crash with TypeError since `None[0]` is unsubscriptable.
+        Verify the `(raw.get(...) or [[]])[0]` guard handles both
+        missing-key and present-but-None uniformly.
+        """
+        from architectures.hybrid_rag import tools
+
+        class _StubModel:
+            def encode(self, queries, normalize_embeddings=False):
+                class _Vec:
+                    def tolist(self):
+                        return [0.0]
+
+                return [_Vec()]
+
+        class _StubCollection:
+            def query(self, **kwargs):
+                # Realistic ChromaDB-with-include-narrowing shape: ids
+                # and documents populated, metadatas explicitly None.
+                return {
+                    "ids": [["a"]],
+                    "documents": [["alpha-text"]],
+                    "metadatas": None,
+                }
+
+        monkeypatch.setattr(tools, "_get_embedding_model", lambda: _StubModel())
+        monkeypatch.setattr(tools, "_get_collection", lambda: _StubCollection())
+
+        # Must not raise. Result is empty because zip() over the empty
+        # metadatas list yields no rows — that's acceptable silent
+        # degradation; the crash was the bug.
+        result = tools._vector_topk("anything", 5)
+        assert result == []
+
     def test_hybrid_search_coerces_non_int_k_to_default(self, monkeypatch):
         """Schema declares k as integer but the Anthropic SDK forwards
         raw JSON — `k: null` arrives as Python None. int(None) would

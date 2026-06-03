@@ -148,6 +148,44 @@ class TestVectorSearchBounds:
             == "integer"
         )
 
+    def test_vector_search_tolerates_explicit_none_in_chromadb_response(
+        self, monkeypatch
+    ):
+        """Issue #34: ChromaDB returns parallel-array keys (ids, documents,
+        metadatas, distances) but their *values* can be None — e.g., if a
+        future refactor adds `include=['documents']` to the query call,
+        metadatas is None, not absent. `raw.get("metadatas", [[]])[0]`
+        would then crash with TypeError since `None[0]` is unsubscriptable.
+        Verify the `(raw.get(...) or [[]])[0]` guard handles both
+        missing-key and present-but-None uniformly.
+        """
+        from architectures.naive_rag import tools
+
+        class _StubModel:
+            def encode(self, queries, normalize_embeddings=False):
+                class _Vec:
+                    def tolist(self):
+                        return [0.0]
+
+                return [_Vec()]
+
+        class _StubCollection:
+            def query(self, **kwargs):
+                return {
+                    "ids": [["a"]],
+                    "documents": [["alpha-text"]],
+                    "metadatas": None,
+                    "distances": None,
+                }
+
+        monkeypatch.setattr(tools, "_get_embedding_model", lambda: _StubModel())
+        monkeypatch.setattr(tools, "_get_collection", lambda: _StubCollection())
+
+        # Must not raise. Empty chunks list is acceptable silent
+        # degradation; the crash was the bug.
+        result = tools.vector_search("anything", k=5)
+        assert result["chunks"] == []
+
     @pytest.mark.slow
     def test_returns_chunks_with_citation_metadata(self):
         """Run a real query against the vector store. Marked slow

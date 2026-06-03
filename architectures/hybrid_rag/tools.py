@@ -169,9 +169,15 @@ def _vector_topk(query: str, k: int) -> list[dict[str, Any]]:
     query_embedding = model.encode([query], normalize_embeddings=True)[0].tolist()
     raw = collection.query(query_embeddings=[query_embedding], n_results=k)
 
-    ids = raw.get("ids", [[]])[0]
-    documents = raw.get("documents", [[]])[0]
-    metadatas = raw.get("metadatas", [[]])[0]
+    # `dict.get(key, default)` returns the *stored value* when key is
+    # present, even when that value is None — ChromaDB's query response
+    # can include parallel-array keys with value None (e.g., metadatas
+    # is None when `include` is set to exclude it). The `or [[]]` guard
+    # handles both missing-key and present-but-None cases uniformly. See
+    # issue #34.
+    ids = (raw.get("ids") or [[]])[0]
+    documents = (raw.get("documents") or [[]])[0]
+    metadatas = (raw.get("metadatas") or [[]])[0]
     out: list[dict[str, Any]] = []
     for chunk_id, text, meta in zip(ids, documents, metadatas):
         out.append(
