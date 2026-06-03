@@ -89,6 +89,39 @@ class TestAgentRegistration:
         assert "naive_rag" in ARCHITECTURE_REGISTRY
         assert callable(ARCHITECTURE_REGISTRY["naive_rag"])
 
+    def test_register_surfaces_broken_runner_import(self, monkeypatch):
+        """Issue #33: if measurement.runner exists but `register_architecture`
+        can't be imported (e.g., a transitive import failed), `_register()`
+        must surface the ImportError — not silently pass. A bare
+        `except ImportError: pass` here would route debugging to the wrong
+        file.
+        """
+        import measurement.runner
+
+        from architectures.naive_rag.agent import _register
+
+        monkeypatch.delattr(measurement.runner, "register_architecture")
+        with pytest.raises(ImportError):
+            _register()
+
+    def test_register_silent_when_measurement_package_absent(self, monkeypatch):
+        """Codex PR #37 review: when the `measurement` package itself
+        isn't on sys.path (architecture modules used standalone),
+        find_spec raises ModuleNotFoundError before it can return None.
+        _register() must catch that and skip silently, preserving the
+        original opt-in behaviour.
+        """
+        import importlib.util
+
+        from architectures.naive_rag.agent import _register
+
+        def _missing_parent(name, *args, **kwargs):
+            raise ModuleNotFoundError(f"No module named 'measurement'")
+
+        monkeypatch.setattr(importlib.util, "find_spec", _missing_parent)
+        # Must not raise — silent skip is the intentional behaviour.
+        _register()
+
 
 # ---------------------------------------------------------------------------
 # vector_search bounds

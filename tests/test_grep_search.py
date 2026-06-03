@@ -297,3 +297,31 @@ class TestAgentRegistration:
 
         assert "grep_search" in ARCHITECTURE_REGISTRY
         assert callable(ARCHITECTURE_REGISTRY["grep_search"])
+
+    def test_register_surfaces_broken_runner_import(self, monkeypatch):
+        """Issue #33: if measurement.runner exists but `register_architecture`
+        can't be imported (e.g., a transitive import failed), `_register()`
+        must surface the ImportError — not silently pass.
+        """
+        import measurement.runner
+
+        from architectures.grep_search.agent import _register
+
+        monkeypatch.delattr(measurement.runner, "register_architecture")
+        with pytest.raises(ImportError):
+            _register()
+
+    def test_register_silent_when_measurement_package_absent(self, monkeypatch):
+        """Codex PR #37 review: find_spec raises ModuleNotFoundError when
+        the parent `measurement` package isn't on sys.path. _register()
+        must catch that and skip silently.
+        """
+        import importlib.util
+
+        from architectures.grep_search.agent import _register
+
+        def _missing_parent(name, *args, **kwargs):
+            raise ModuleNotFoundError(f"No module named 'measurement'")
+
+        monkeypatch.setattr(importlib.util, "find_spec", _missing_parent)
+        _register()

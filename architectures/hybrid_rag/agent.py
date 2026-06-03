@@ -43,13 +43,34 @@ def run_task(
 
 
 def _register() -> None:
-    """Idempotent registration into the runner's ARCHITECTURE_REGISTRY."""
-    try:
-        from measurement.runner import register_architecture
+    """Idempotent registration into the runner's ARCHITECTURE_REGISTRY.
 
-        register_architecture("hybrid_rag", run_task)
-    except ImportError:
-        pass
+    The find_spec gate distinguishes "measurement.runner module is
+    genuinely absent" (minimal test envs — silent skip is correct) from
+    "runner exists but its import chain broke" (typo in measurement.tokens,
+    missing transitive dep, etc.). A bare `except ImportError: pass` here
+    would swallow the second case and the architecture would silently fail
+    to register, routing debugging to the wrong file. See issue #33.
+
+    Note find_spec itself raises ModuleNotFoundError when the parent
+    `measurement` package isn't on sys.path at all (vs returning None
+    when the parent exists but `runner` is missing as a submodule).
+    Catch ModuleNotFoundError specifically — NOT the broader ImportError —
+    so a broken `measurement/__init__.py` (ImportError but not
+    ModuleNotFoundError) still propagates loudly, preserving the spirit
+    of the fix.
+    """
+    import importlib.util
+
+    try:
+        spec = importlib.util.find_spec("measurement.runner")
+    except ModuleNotFoundError:
+        return
+    if spec is None:
+        return
+    from measurement.runner import register_architecture
+
+    register_architecture("hybrid_rag", run_task)
 
 
 _register()
