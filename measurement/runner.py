@@ -8,22 +8,27 @@ Three modes:
 
   --architectures Run measurement across listed architectures × tasks ×
                   runs. Writes per-architecture JSON to
-                  measurement/results/architecture_<id>.json.
-                  (Phase 2 — requires architectures to be registered.)
+                  measurement/results/architecture_<id>.json. Order is
+                  per-task across architectures (METHODOLOGY §"Run
+                  protocol") to control for time-of-day API variance.
+                  Use --limit N to truncate the task set for a cheap
+                  end-to-end smoke before the full run.
 
   --report        Aggregate the per-architecture JSON files into
                   measurement/results/comparison.md.
 
 Architectures register themselves into ARCHITECTURE_REGISTRY when their
-modules are imported. Phase 1 ships only the built-in smoke "architecture"
-(a single direct API call, not a real architecture); Naive RAG / Grep search / Hybrid RAG register in
-Phase 2 when their agent.py modules land.
+agent.py modules are imported. The runner imports them lazily on
+--architectures dispatch so unrelated commands (--smoke, --report) don't
+pay the import cost or require the architecture's heavy deps.
 """
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean, median
 from typing import Any, Callable
@@ -42,22 +47,17 @@ try:
 except ImportError:
     pass
 
+from measurement.registry import ARCHITECTURE_REGISTRY, register_architecture
 from measurement.tokens import AGENT_MODEL, decompose_request, record_run
 
 
-# ---------------------------------------------------------------------------
-# Architecture registry (Phase 2 populates this)
-# ---------------------------------------------------------------------------
-
-
-ARCHITECTURE_REGISTRY: dict[str, Callable] = {}
-
-
-def register_architecture(name: str, agent_fn: Callable) -> None:
-    """Register an architecture's agent function. Called from each
-    `architectures/<arch>/agent.py` module at import time.
-    """
-    ARCHITECTURE_REGISTRY[name] = agent_fn
+# `ARCHITECTURE_REGISTRY` and `register_architecture` live in
+# `measurement.registry` (re-exported here) so they have a single
+# identity even when this module is loaded twice (once as `__main__`,
+# once as `measurement.runner`) — see the docstring on
+# `measurement.registry` for the full reasoning. Existing callers
+# (`from measurement.runner import register_architecture`) keep working.
+__all__ = ["ARCHITECTURE_REGISTRY", "register_architecture"]
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +167,255 @@ def run_smoke(*, client: anthropic.Anthropic | None = None) -> int:
         print(f"FAIL: methodology gate exceeded ({ratio:.1%} > 5%)")
         return 1
     print("PASS: methodology gate held — Phase 1 deliverable verified")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Full measurement run (Phase 2 — --architectures dispatch)
+# ---------------------------------------------------------------------------
+
+
+# METHODOLOGY §"What gets counted": the decomposition of categories ①–⑤
+# (audit-inclusive at the gate level — METHODOLOGY §"Audit log specification")
+# must sum to API-reported `input_tokens` within 5%. Breaches are flagged
+# in the per-run record, not silenced — see CLAUDE.md invariant.
+_GATE_TOLERANCE = 0.05
+
+# METHODOLOGY §"Run protocol": "If any run produces an API error, that
+# run is retried up to twice." So initial attempt + 2 retries = 3 tries max.
+_MAX_RETRIES = 2
+
+
+def _load_tasks(path: Path) -> list[dict[str, Any]]:
+    """Read tasks.jsonl, skipping comment lines (`# …`) and blank lines.
+
+    The first line of `measurement/tasks.jsonl` is a freeze marker; the
+    schema is otherwise one JSON object per line.
+    """
+    tasks: list[dict[str, Any]] = []
+    for line in path.read_text().splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        tasks.append(json.loads(s))
+    return tasks
+
+
+def _load_architectures(names: list[str]) -> dict[str, Callable]:
+    """Resolve architecture names to their `run_task` callables.
+
+    Imports `architectures.<name>.agent` for any name not already in
+    ARCHITECTURE_REGISTRY; the agent module's `_register()` side-effect
+    populates the registry. Names already present (e.g., test fakes
+    inserted via `register_architecture`) are used as-is, so tests can
+    inject mocks without touching the filesystem.
+    """
+    resolved: dict[str, Callable] = {}
+    for name in names:
+        if name not in ARCHITECTURE_REGISTRY:
+            try:
+                importlib.import_module(f"architectures.{name}.agent")
+            except ModuleNotFoundError as e:
+                raise RuntimeError(
+                    f"Architecture '{name}' not found "
+                    f"(architectures/{name}/agent.py): {e}"
+                ) from e
+        if name not in ARCHITECTURE_REGISTRY:
+            raise RuntimeError(
+                f"Architecture '{name}' imported but did not self-register. "
+                f"Check architectures/{name}/agent.py::_register() and that "
+                f"measurement.runner.register_architecture is importable."
+            )
+        resolved[name] = ARCHITECTURE_REGISTRY[name]
+    return resolved
+
+
+def _gate_ratio(record: dict[str, Any]) -> float:
+    """5% decomposition gate ratio for one run record.
+
+    Uses `decomposition_input_sum_with_audit` when present (multi-turn
+    architectures via _shared/agent_loop emit it; audit_log tokens are
+    real API input and must be in the gate-side sum, even though they're
+    excluded from the *reported* decomposition). Falls back to
+    `decomposition_input_sum` for single-turn callers (the smoke path).
+    """
+    api_input = record["api_input_tokens"]
+    if api_input == 0:
+        return 0.0
+    inclusive = record.get(
+        "decomposition_input_sum_with_audit", record["decomposition_input_sum"]
+    )
+    return abs(inclusive - api_input) / api_input
+
+
+def _dispatch_one(
+    *,
+    arch_fn: Callable,
+    task: dict[str, Any],
+    client: anthropic.Anthropic,
+    arch_name: str,
+    run_index: int,
+    runs_total: int,
+) -> dict[str, Any] | None:
+    """Run a single (arch, task) pair with retry per METHODOLOGY.
+
+    Returns the record dict on success or None if all attempts failed
+    (the caller logs the error to the per-architecture error list).
+    """
+    last_exc: Exception | None = None
+    attempts = 0
+    while attempts <= _MAX_RETRIES:
+        attempts += 1
+        try:
+            record = arch_fn(task, client=client)
+        except Exception as e:
+            last_exc = e
+            print(
+                f"[retry] arch={arch_name} task={task['task_id']} "
+                f"run={run_index + 1}/{runs_total} attempt={attempts} "
+                f"failed: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            continue
+        record["run_index"] = run_index
+        record["attempts"] = attempts
+        ratio = _gate_ratio(record)
+        record["gate_ratio"] = ratio
+        record["gate_breach"] = ratio >= _GATE_TOLERANCE
+        if record["gate_breach"]:
+            print(
+                f"[gate-breach] arch={arch_name} task={task['task_id']} "
+                f"run={run_index + 1}/{runs_total} ratio={ratio:.1%} "
+                f"(API={record['api_input_tokens']}, "
+                f"inclusive_sum={record.get('decomposition_input_sum_with_audit', record['decomposition_input_sum'])}) "
+                f"— flagged, not silenced per METHODOLOGY",
+                file=sys.stderr,
+            )
+        print(
+            f"[ok] arch={arch_name} task={task['task_id']} "
+            f"run={run_index + 1}/{runs_total} "
+            f"turns={record.get('turns', 1)} "
+            f"input={record['api_input_tokens']} "
+            f"output={record['api_output_tokens']} "
+            f"gate={ratio:.1%}"
+        )
+        return record
+    # Exhausted retries.
+    print(
+        f"[fail] arch={arch_name} task={task['task_id']} "
+        f"run={run_index + 1}/{runs_total} gave up after {attempts} attempts: "
+        f"{type(last_exc).__name__}: {last_exc}",
+        file=sys.stderr,
+    )
+    return None
+
+
+def run_measurement(
+    *,
+    architectures: list[str],
+    tasks_path: Path,
+    runs: int,
+    results_dir: Path,
+    limit: int | None = None,
+    client: anthropic.Anthropic | None = None,
+) -> int:
+    """Drive every (architecture, task, run_index) triple and persist results.
+
+    Order (METHODOLOGY §"Run protocol" — control for time-of-day API
+    variance): outer loop = run_index, then for each task, dispatch every
+    architecture back-to-back before moving to the next task.
+
+    Output: one `architecture_<name>.json` per architecture in
+    `results_dir`, shape compatible with `--report` aggregation:
+        {
+          "architecture": <name>,
+          "config": {...},
+          "runs": [<record_run dict with run_index/gate_ratio/etc>, ...],
+          "errors": [{"task_id", "run_index", "type", "error", "attempts"}, ...]
+        }
+
+    Returns 0 on completion (even if some runs hit the gate or errored —
+    those are flagged in the records). Returns 1 only on systemic failure
+    (no tasks, unresolvable architecture).
+    """
+    if client is None:
+        client = anthropic.Anthropic()
+
+    arch_fns = _load_architectures(architectures)
+    tasks = _load_tasks(tasks_path)
+    if limit is not None:
+        tasks = tasks[:limit]
+    if not tasks:
+        print(f"No tasks loaded from {tasks_path}", file=sys.stderr)
+        return 1
+
+    per_arch_runs: dict[str, list[dict[str, Any]]] = {n: [] for n in architectures}
+    per_arch_errors: dict[str, list[dict[str, Any]]] = {n: [] for n in architectures}
+    breach_count = 0
+    started_at = datetime.now(timezone.utc).isoformat()
+
+    total_calls = runs * len(tasks) * len(architectures)
+    print(
+        f"Starting measurement: {len(architectures)} arch × {len(tasks)} task × "
+        f"{runs} run = {total_calls} (architecture, task, run) triples.",
+        file=sys.stderr,
+    )
+
+    for run_index in range(runs):
+        for task in tasks:
+            for arch in architectures:
+                record = _dispatch_one(
+                    arch_fn=arch_fns[arch],
+                    task=task,
+                    client=client,
+                    arch_name=arch,
+                    run_index=run_index,
+                    runs_total=runs,
+                )
+                if record is None:
+                    per_arch_errors[arch].append(
+                        {
+                            "task_id": task["task_id"],
+                            "run_index": run_index,
+                            "attempts": _MAX_RETRIES + 1,
+                        }
+                    )
+                    continue
+                if record["gate_breach"]:
+                    breach_count += 1
+                per_arch_runs[arch].append(record)
+
+    completed_at = datetime.now(timezone.utc).isoformat()
+    results_dir.mkdir(parents=True, exist_ok=True)
+    for arch in architectures:
+        path = results_dir / f"architecture_{arch}.json"
+        payload = {
+            "architecture": arch,
+            "config": {
+                "tasks_path": str(tasks_path),
+                "tasks_count": len(tasks),
+                "runs_per_task": runs,
+                "limit": limit,
+                "started_at": started_at,
+                "completed_at": completed_at,
+            },
+            "runs": per_arch_runs[arch],
+            "errors": per_arch_errors[arch],
+        }
+        path.write_text(json.dumps(payload, indent=2) + "\n")
+        print(
+            f"Wrote {path}: "
+            f"{len(per_arch_runs[arch])} runs, "
+            f"{len(per_arch_errors[arch])} errors."
+        )
+
+    if breach_count:
+        print(
+            f"\nNOTE: {breach_count} run(s) exceeded the 5% decomposition "
+            f"gate. See gate_breach=true entries in the result JSONs. "
+            f"Per CLAUDE.md these are flagged, not silenced.",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -305,6 +554,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Number of runs per task per architecture (default: 3).",
     )
     parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help=(
+            "Truncate task set to the first N tasks. Use for a cheap "
+            "end-to-end smoke (--limit 1 --runs 1 across all archs is "
+            "~one paid API call per architecture) before kicking off "
+            "the full run."
+        ),
+    )
+    parser.add_argument(
         "--report",
         action="store_true",
         help="Aggregate result JSONs into measurement/results/comparison.md.",
@@ -335,16 +595,24 @@ def main(argv: list[str] | None = None) -> int:
             output_path=args.results_dir / "comparison.md",
         )
 
-    if args.architectures and args.tasks:
-        print(
-            "Full measurement runs land in Phase 2 (architectures must be "
-            "registered first). See BUILD_PLAN.md.",
-            file=sys.stderr,
+    if args.architectures:
+        archs = [a.strip() for a in args.architectures.split(",") if a.strip()]
+        if not archs:
+            print("--architectures was empty after parsing.", file=sys.stderr)
+            return 2
+        tasks_path = args.tasks or Path("measurement/tasks.jsonl")
+        return run_measurement(
+            architectures=archs,
+            tasks_path=tasks_path,
+            runs=args.runs,
+            results_dir=args.results_dir,
+            limit=args.limit,
         )
-        return 1
 
     print(
-        "Usage: runner.py --smoke | --report | --architectures naive_rag,grep_search,hybrid_rag --tasks tasks.jsonl",
+        "Usage: runner.py --smoke | --report | "
+        "--architectures naive_rag,grep_search,hybrid_rag "
+        "[--tasks measurement/tasks.jsonl] [--runs 3] [--limit N]",
         file=sys.stderr,
     )
     return 2
