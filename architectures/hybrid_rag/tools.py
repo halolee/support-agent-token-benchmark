@@ -21,6 +21,7 @@ import this module without paying the model-load cost.
 from __future__ import annotations
 
 import json
+import math
 import pickle
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,7 @@ from architectures._shared.booking_tools import (
 
 from .setup_indices import (
     BM25_INDEX_PATH,
+    BM25_INDEX_VERSION,
     COLLECTION_NAME,
     EMBEDDING_MODEL_NAME,
     RERANKER_MODEL_NAME,
@@ -118,8 +120,21 @@ def _get_bm25():
                 f"`python -m architectures.hybrid_rag.setup_indices` first."
             )
         with open(BM25_INDEX_PATH, "rb") as f:
-            _bm25_payload = pickle.load(f)
-        _bm25 = BM25Okapi(_bm25_payload["tokenised_corpus"])
+            payload = pickle.load(f)
+        version = payload.get("version") if isinstance(payload, dict) else None
+        if version != BM25_INDEX_VERSION:
+            raise ValueError(
+                f"BM25 index version mismatch at {BM25_INDEX_PATH}: "
+                f"pickle has version={version!r}, code expects "
+                f"{BM25_INDEX_VERSION}. Rebuild with "
+                f"`python -m architectures.hybrid_rag.setup_indices`."
+            )
+        # Build BM25Okapi BEFORE mutating module globals — if construction
+        # raises (corrupt corpus, missing key), we don't leave the partial
+        # payload visible to subsequent callers.
+        bm25_instance = BM25Okapi(payload["tokenised_corpus"])
+        _bm25_payload = payload
+        _bm25 = bm25_instance
     return _bm25, _bm25_payload
 
 
@@ -238,22 +253,41 @@ def _rrf_fuse(
     return [fused[cid] for cid in ranked_ids]
 
 
+def _safe_rerank_score(raw: Any) -> float:
+    """Coerce a reranker score to float; map NaN to -inf so the sort
+    places degenerate scores last DETERMINISTICALLY. Python's sorted()
+    has undefined behaviour with NaN keys — a single NaN can shuffle
+    results across runs and break METHODOLOGY's median-of-three
+    reproducibility contract.
+    """
+    v = float(raw)
+    return float("-inf") if math.isnan(v) else v
+
+
 def _rerank(query: str, candidates: list[dict[str, Any]], k: int) -> list[dict[str, Any]]:
-    """Cross-encoder rerank. Returns top-k candidates in reranked order.
+    """Cross-encoder rerank. Returns top-k candidates in reranked order,
+    each annotated with a `score` field (None if rerank was skipped).
 
     Skipped if candidates are empty or only one (nothing to reorder).
     """
     if len(candidates) <= 1:
+        for c in candidates:
+            c.setdefault("score", None)
         return candidates[:k]
     reranker = _get_reranker()
     pairs = [(query, c["text"]) for c in candidates]
     scores = reranker.predict(pairs)
     ranked = sorted(
         zip(candidates, scores),
-        key=lambda pair: float(pair[1]),
+        key=lambda pair: _safe_rerank_score(pair[1]),
         reverse=True,
     )
-    return [c for c, _ in ranked[:k]]
+    out: list[dict[str, Any]] = []
+    for c, s in ranked[:k]:
+        v = float(s)
+        c["score"] = None if math.isnan(v) else v
+        out.append(c)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -275,8 +309,18 @@ def hybrid_search(query: str, k: int = DEFAULT_K) -> dict[str, Any]:
     produce more candidates than the union of its inputs, and an LLM
     passing an absurd k shouldn't be able to blow up retrieved_context
     tokens.
+
+    Non-int / None `k` (the schema declares integer, but the SDK forwards
+    raw JSON so a `k: null` payload arrives as Python None) is coerced
+    to DEFAULT_K rather than raising — the alternative inflates
+    agent_intermediate tokens via an error tool_result + model retry,
+    asymmetrically penalising hybrid_rag's measured cost.
     """
-    bounded_k = max(1, min(int(k), _K_CEILING))
+    try:
+        k_int = int(k)
+    except (TypeError, ValueError):
+        k_int = DEFAULT_K
+    bounded_k = max(1, min(k_int, _K_CEILING))
 
     vector_hits = _vector_topk(query, VECTOR_TOP_K)
     bm25_hits = _bm25_topk(query, BM25_TOP_K)
@@ -292,6 +336,11 @@ def hybrid_search(query: str, k: int = DEFAULT_K) -> dict[str, Any]:
                 "section_id": c["section_id"],
                 "section_title": c["section_title"],
                 "text": c["text"],
+                # Cross-encoder rerank score — parallels naive_rag's per-chunk
+                # `distance` so downstream tuning/debugging has retrieval-
+                # quality signal at parity across architectures. None when
+                # rerank was skipped (≤1 candidate).
+                "score": c.get("score"),
             }
             for c in reranked
         ],

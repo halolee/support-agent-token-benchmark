@@ -124,6 +124,16 @@ class TestRRFFusion:
         out = _rrf_fuse(vector, [])
         assert [c["chunk_id"] for c in out] == ["A", "B"]
 
+    def test_empty_vector_returns_bm25_hits(self):
+        """Symmetric to test_one_empty_list_returns_other — guards
+        against a refactor that accidentally drops the BM25 loop.
+        """
+        from architectures.hybrid_rag.tools import _rrf_fuse
+
+        bm25 = [_hit("X"), _hit("Y")]
+        out = _rrf_fuse([], bm25)
+        assert [c["chunk_id"] for c in out] == ["X", "Y"]
+
     def test_rank_within_list_drives_score(self):
         """Rank 1 contributes 1/(k+1); rank 2 contributes 1/(k+2). So a
         chunk at rank 1 in one list should beat a chunk at rank 5 in
@@ -149,6 +159,51 @@ class TestHybridSearchBounds:
         assert VECTOR_TOP_K == 5
         assert BM25_TOP_K == 5
         assert _K_CEILING == VECTOR_TOP_K + BM25_TOP_K
+
+    def test_hybrid_search_clamps_oversized_k_without_models(self, monkeypatch):
+        """Fast unit test for the k clamp — stubs the retrieval components
+        so we exercise the bound without loading BGE-M3 or the cross-
+        encoder. The `slow` end-to-end test covers the same path against
+        real indices; this one runs in default pytest and catches a
+        regression that removes the max(1, min(int(k), _K_CEILING)) wrap.
+        """
+        from architectures.hybrid_rag import tools
+
+        monkeypatch.setattr(
+            tools,
+            "_vector_topk",
+            lambda q, n: [_hit(f"V{i}") for i in range(n)],
+        )
+        monkeypatch.setattr(
+            tools,
+            "_bm25_topk",
+            lambda q, n: [_hit(f"B{i}") for i in range(n)],
+        )
+        # Bypass the cross-encoder load — return the candidates trimmed
+        # to k so we can observe the clamp without invoking the model.
+        monkeypatch.setattr(tools, "_rerank", lambda q, c, k: c[:k])
+
+        result = tools.hybrid_search("anything", k=10_000)
+        assert result["k"] == tools._K_CEILING
+        assert len(result["chunks"]) <= tools._K_CEILING
+
+    def test_hybrid_search_coerces_non_int_k_to_default(self, monkeypatch):
+        """Schema declares k as integer but the Anthropic SDK forwards
+        raw JSON — `k: null` arrives as Python None. int(None) would
+        TypeError out of dispatch; coerce to DEFAULT_K instead.
+        """
+        from architectures.hybrid_rag import tools
+
+        monkeypatch.setattr(tools, "_vector_topk", lambda q, n: [])
+        monkeypatch.setattr(tools, "_bm25_topk", lambda q, n: [])
+        monkeypatch.setattr(tools, "_rerank", lambda q, c, k: c[:k])
+
+        # k=None (model passed "k": null)
+        result_none = tools.hybrid_search("x", k=None)
+        assert result_none["k"] == tools.DEFAULT_K
+        # k="abc" (model hallucinated a non-numeric string)
+        result_str = tools.hybrid_search("x", k="abc")
+        assert result_str["k"] == tools.DEFAULT_K
 
 
 class TestBM25Tokenizer:
@@ -215,9 +270,20 @@ class TestPromptTokenBudget:
 
 
 class TestAgentRegistration:
-    def test_registers_into_runner_registry(self):
-        import architectures.hybrid_rag.agent  # noqa: F401  (triggers registration)
+    def test_registers_into_runner_registry(self, monkeypatch):
+        """Actively exercise _register(): drop any pre-existing
+        `hybrid_rag` entry and force a fresh module import so the test
+        verifies the registration code path actually runs — not just
+        that some prior test left a stub behind.
+        """
+        import sys
+
         from measurement.runner import ARCHITECTURE_REGISTRY
+
+        monkeypatch.delitem(ARCHITECTURE_REGISTRY, "hybrid_rag", raising=False)
+        sys.modules.pop("architectures.hybrid_rag.agent", None)
+
+        import architectures.hybrid_rag.agent  # noqa: F401  (triggers registration)
 
         assert "hybrid_rag" in ARCHITECTURE_REGISTRY
         assert callable(ARCHITECTURE_REGISTRY["hybrid_rag"])

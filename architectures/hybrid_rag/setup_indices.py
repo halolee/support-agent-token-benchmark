@@ -21,6 +21,7 @@ same corpus + policy_classes.json.
 """
 from __future__ import annotations
 
+import os
 import pickle
 import re
 import shutil
@@ -48,6 +49,11 @@ BM25_INDEX_PATH = VECTOR_STORE_DIR / "bm25_index.pkl"
 COLLECTION_NAME = "swiss_faq"
 EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
 RERANKER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+# Bump when the BM25 pickle schema or tokenizer changes — `_get_bm25`
+# rejects mismatched pickles so stale on-disk indices surface as a clear
+# rebuild error rather than silently mis-scoring queries.
+BM25_INDEX_VERSION = 1
 
 
 # ---------------------------------------------------------------------------
@@ -141,15 +147,20 @@ def build_indices(*, rebuild: bool = True) -> int:
     # and avoids tying the on-disk format to rank_bm25 internals.
     tokenised = [tokenize_for_bm25(chunk.text) for chunk in chunks]
     payload = {
-        "version": 1,
+        "version": BM25_INDEX_VERSION,
         "tokenised_corpus": tokenised,
         "chunk_ids": [chunk.chunk_id for chunk in chunks],
         "chunk_texts": [chunk.text for chunk in chunks],
         "section_ids": [chunk.section_id for chunk in chunks],
         "section_titles": [chunk.section_title for chunk in chunks],
     }
-    with open(BM25_INDEX_PATH, "wb") as f:
+    # Atomic write: pickle to a sibling .tmp then os.replace, so a crash
+    # mid-dump can't leave a half-written file that _get_bm25 would
+    # UnpicklingError on next load.
+    tmp_path = BM25_INDEX_PATH.parent / (BM25_INDEX_PATH.name + ".tmp")
+    with open(tmp_path, "wb") as f:
         pickle.dump(payload, f)
+    os.replace(tmp_path, BM25_INDEX_PATH)
     print(f"Persisted BM25 index ({len(chunks)} chunks) to {BM25_INDEX_PATH}")
 
     return len(chunks)
