@@ -148,6 +148,54 @@ class TestVectorSearchBounds:
             == "integer"
         )
 
+    def test_vector_search_tolerates_explicit_none_in_chromadb_response(
+        self, monkeypatch
+    ):
+        """Issue #34 + Codex PR #40 review: ChromaDB returns parallel-array
+        keys (ids, documents, metadatas, distances) but their *values*
+        can be None — e.g., a future `include=['documents']` optimisation
+        drops metadata to save bytes. `raw.get("metadatas", [[]])[0]`
+        crashed with TypeError because `None[0]` is unsubscriptable.
+
+        The fix: (1) `(raw.get(...) or [[]])[0]` collapses missing-key
+        and present-but-None uniformly; (2) pad parallel arrays to
+        len(ids) so populated ids/documents aren't silently dropped by
+        zip() when metadatas/distances come back shorter — Naive RAG
+        would otherwise return zero chunks despite retrieval succeeding.
+        """
+        from architectures.naive_rag import tools
+
+        class _StubModel:
+            def encode(self, queries, normalize_embeddings=False):
+                class _Vec:
+                    def tolist(self):
+                        return [0.0]
+
+                return [_Vec()]
+
+        class _StubCollection:
+            def query(self, **kwargs):
+                return {
+                    "ids": [["a", "b"]],
+                    "documents": [["alpha-text", "beta-text"]],
+                    "metadatas": None,
+                    "distances": None,
+                }
+
+        monkeypatch.setattr(tools, "_get_embedding_model", lambda: _StubModel())
+        monkeypatch.setattr(tools, "_get_collection", lambda: _StubCollection())
+
+        result = tools.vector_search("anything", k=5)
+        # Both hits preserved (not silently zip-truncated); metadata
+        # and distance fields padded so the agent still sees the chunks.
+        chunks = result["chunks"]
+        assert len(chunks) == 2
+        assert [c["chunk_id"] for c in chunks] == ["a", "b"]
+        assert [c["text"] for c in chunks] == ["alpha-text", "beta-text"]
+        assert all(c["section_id"] is None for c in chunks)
+        assert all(c["section_title"] is None for c in chunks)
+        assert all(c["distance"] is None for c in chunks)
+
     @pytest.mark.slow
     def test_returns_chunks_with_citation_metadata(self):
         """Run a real query against the vector store. Marked slow

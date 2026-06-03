@@ -187,6 +187,55 @@ class TestHybridSearchBounds:
         assert result["k"] == tools._K_CEILING
         assert len(result["chunks"]) <= tools._K_CEILING
 
+    def test_vector_topk_tolerates_explicit_none_in_chromadb_response(
+        self, monkeypatch
+    ):
+        """Issue #34 + Codex PR #40 review: ChromaDB returns parallel-array
+        keys (ids, documents, metadatas) but their *values* can be None —
+        e.g., a future `include=['documents']` optimisation drops
+        metadata to save bytes. `raw.get("metadatas", [[]])[0]` crashed
+        with TypeError because `None[0]` is unsubscriptable.
+
+        The fix: (1) `(raw.get(...) or [[]])[0]` collapses missing-key
+        and present-but-None uniformly; (2) pad parallel arrays to
+        len(ids) so populated ids/documents aren't silently dropped by
+        zip() when metadatas comes back shorter — the vector side of
+        RRF would otherwise go dark instead of contributing chunks with
+        blank citation metadata.
+        """
+        from architectures.hybrid_rag import tools
+
+        class _StubModel:
+            def encode(self, queries, normalize_embeddings=False):
+                class _Vec:
+                    def tolist(self):
+                        return [0.0]
+
+                return [_Vec()]
+
+        class _StubCollection:
+            def query(self, **kwargs):
+                # Realistic include=['documents'] shape: ids + documents
+                # populated, metadatas explicitly None.
+                return {
+                    "ids": [["a", "b"]],
+                    "documents": [["alpha-text", "beta-text"]],
+                    "metadatas": None,
+                }
+
+        monkeypatch.setattr(tools, "_get_embedding_model", lambda: _StubModel())
+        monkeypatch.setattr(tools, "_get_collection", lambda: _StubCollection())
+
+        result = tools._vector_topk("anything", 5)
+        # Both hits preserved (not silently zip-truncated); metadata
+        # padded to blanks so the agent can still see the chunk text.
+        assert len(result) == 2
+        assert [r["chunk_id"] for r in result] == ["a", "b"]
+        assert [r["text"] for r in result] == ["alpha-text", "beta-text"]
+        # Metadata fields surface as None rather than vanishing entirely.
+        assert all(r["section_id"] is None for r in result)
+        assert all(r["section_title"] is None for r in result)
+
     def test_hybrid_search_coerces_non_int_k_to_default(self, monkeypatch):
         """Schema declares k as integer but the Anthropic SDK forwards
         raw JSON — `k: null` arrives as Python None. int(None) would
