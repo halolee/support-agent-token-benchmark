@@ -301,6 +301,21 @@ class TestAgentRegistration:
         with pytest.raises(ImportError):
             _register()
 
+    def test_register_silent_when_measurement_package_absent(self, monkeypatch):
+        """Codex PR #37 review: find_spec raises ModuleNotFoundError when
+        the parent `measurement` package isn't on sys.path. _register()
+        must catch that and skip silently.
+        """
+        import importlib.util
+
+        from architectures.hybrid_rag.agent import _register
+
+        def _missing_parent(name, *args, **kwargs):
+            raise ModuleNotFoundError(f"No module named 'measurement'")
+
+        monkeypatch.setattr(importlib.util, "find_spec", _missing_parent)
+        _register()
+
 
 # ---------------------------------------------------------------------------
 # End-to-end retrieval against real indices (slow)
