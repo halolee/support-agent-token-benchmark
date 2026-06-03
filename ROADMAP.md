@@ -133,6 +133,7 @@ Significant scope decisions and their rationale:
 | Design phase | Phased build (foundation → core → variant → optional) | Allows shipping a working artifact at each phase. Supports parallel execution with job hunt. |
 | 2026-05-25 | Added "corpus/data evolution axis" to Beyond v2 | Surfaced during Phase 1 Step 0 corpus inventory. The bucket's travel→travel2 evolution suggested an adaptation-cost experimental axis distinct from per-call token cost. Flagged as a good contributor fit for the open-source v2+. |
 | 2026-05-25 | Stay Python for v1; .NET reference implementation noted as Beyond-v2 candidate | Solo-founder runway considerations favor the language ecosystem with mature AI tooling — even Microsoft pushes Python for Azure AI Foundry and Semantic Kernel's Python flavor. The methodology is language-invariant, so .NET-shaped enterprise readers can map architectures to their stack via the component mapping in the Beyond-v2 entry. The article will include a "mapping to .NET ecosystem" paragraph for that audience. |
+| 2026-06-02 | Froze benchmark task set at 17/17 (3 POL, 3 TXN, 8 MIX, 3 EDGE) | Merge of [#16](https://github.com/halolee/support-agent-token-benchmark/pull/16) (commit `e5f8c43`); also tagged `tasks-frozen-v1`. All measured architectures run against this set. Anchor for reproducibility — the published numbers in `comparison.md` are tied to this task set. Edits create new IDs and deprecate old ones per CLAUDE.md invariants. |
 
 ## How this document gets updated
 
