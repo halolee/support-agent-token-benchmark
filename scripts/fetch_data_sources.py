@@ -21,7 +21,6 @@ import os
 import shutil
 import sys
 import tempfile
-import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -79,7 +78,12 @@ def sha256_of(path: Path) -> str:
     return h.hexdigest()
 
 
-def _atomic_download(url: str, dest: Path) -> None:
+def _download_to_tmp(url: str, dest: Path) -> Path:
+    """Stream the URL into a sibling .part file and return its path.
+
+    Does NOT touch `dest` — the caller verifies the .part bytes before
+    promoting them. Cleans up the .part on any failure.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(dir=dest.parent, prefix=f".{dest.name}.", suffix=".part")
     tmp_path = Path(tmp_name)
@@ -91,14 +95,19 @@ def _atomic_download(url: str, dest: Path) -> None:
         )
         with urllib.request.urlopen(req, timeout=60) as r, tmp_path.open("wb") as out:
             shutil.copyfileobj(r, out, length=1024 * 1024)
-        tmp_path.replace(dest)
     except BaseException:
         tmp_path.unlink(missing_ok=True)
         raise
+    return tmp_path
 
 
 def fetch_one(src: Source, *, force: bool) -> bool:
-    """Returns True on success, False on failure."""
+    """Returns True on success, False on failure.
+
+    Verifies the downloaded bytes BEFORE replacing the existing `dest`, so
+    a previously-valid file is preserved if both the mirror and upstream
+    return drifted or corrupt bytes.
+    """
     rel = src.rel_path
     if src.dest.exists() and not force:
         actual = sha256_of(src.dest)
@@ -113,21 +122,28 @@ def fetch_one(src: Source, *, force: bool) -> bool:
     for label, url in (("mirror", src.mirror_url), ("upstream GCS", src.upstream_url)):
         print(f"...   {rel} — fetching from {label} ({url})")
         try:
-            _atomic_download(url, src.dest)
-        except (urllib.error.URLError, urllib.error.HTTPError) as e:
-            reason = getattr(e, "reason", e)
+            tmp_path = _download_to_tmp(url, src.dest)
+        except OSError as e:
+            # OSError covers urllib.error.URLError/HTTPError (subclasses) as
+            # well as raw socket errors and TimeoutError raised mid-stream
+            # by copyfileobj when a slow mirror stalls past the read timeout.
+            reason = getattr(e, "reason", None) or str(e) or e.__class__.__name__
             print(f"FAIL  {rel} — {label} unreachable: {reason}")
             continue
-        actual = sha256_of(src.dest)
-        if actual != src.sha256:
-            print(
-                f"FAIL  {rel} — {label} returned hash {actual[:12]}… "
-                f"(expected {src.sha256[:12]}…); refusing to keep."
-            )
-            src.dest.unlink(missing_ok=True)
-            continue
-        print(f"OK    {rel} — {label} verified ({src.size:,} bytes).")
-        return True
+        try:
+            actual = sha256_of(tmp_path)
+            if actual != src.sha256:
+                print(
+                    f"FAIL  {rel} — {label} returned hash {actual[:12]}… "
+                    f"(expected {src.sha256[:12]}…); refusing to keep."
+                )
+                continue
+            tmp_path.replace(src.dest)
+            print(f"OK    {rel} — {label} verified ({src.size:,} bytes).")
+            return True
+        finally:
+            # No-op after a successful replace; cleans up the .part otherwise.
+            tmp_path.unlink(missing_ok=True)
 
     print(f"ERROR {rel} — both mirror and upstream failed. See issue #19.")
     return False
