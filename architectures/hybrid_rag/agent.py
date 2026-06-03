@@ -43,13 +43,22 @@ def run_task(
 
 
 def _register() -> None:
-    """Idempotent registration into the runner's ARCHITECTURE_REGISTRY."""
-    try:
-        from measurement.runner import register_architecture
+    """Idempotent registration into the runner's ARCHITECTURE_REGISTRY.
 
-        register_architecture("hybrid_rag", run_task)
-    except ImportError:
-        pass
+    The find_spec gate distinguishes "measurement.runner module is
+    genuinely absent" (minimal test envs — silent skip is correct) from
+    "runner exists but its import chain broke" (typo in measurement.tokens,
+    missing transitive dep, etc.). A bare `except ImportError: pass` here
+    would swallow the second case and the architecture would silently fail
+    to register, routing debugging to the wrong file. See issue #33.
+    """
+    import importlib.util
+
+    if importlib.util.find_spec("measurement.runner") is None:
+        return
+    from measurement.runner import register_architecture
+
+    register_architecture("hybrid_rag", run_task)
 
 
 _register()

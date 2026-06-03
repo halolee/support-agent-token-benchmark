@@ -89,6 +89,21 @@ class TestAgentRegistration:
         assert "naive_rag" in ARCHITECTURE_REGISTRY
         assert callable(ARCHITECTURE_REGISTRY["naive_rag"])
 
+    def test_register_surfaces_broken_runner_import(self, monkeypatch):
+        """Issue #33: if measurement.runner exists but `register_architecture`
+        can't be imported (e.g., a transitive import failed), `_register()`
+        must surface the ImportError — not silently pass. A bare
+        `except ImportError: pass` here would route debugging to the wrong
+        file.
+        """
+        import measurement.runner
+
+        from architectures.naive_rag.agent import _register
+
+        monkeypatch.delattr(measurement.runner, "register_architecture")
+        with pytest.raises(ImportError):
+            _register()
+
 
 # ---------------------------------------------------------------------------
 # vector_search bounds

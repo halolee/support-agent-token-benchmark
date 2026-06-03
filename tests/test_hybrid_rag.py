@@ -288,6 +288,19 @@ class TestAgentRegistration:
         assert "hybrid_rag" in ARCHITECTURE_REGISTRY
         assert callable(ARCHITECTURE_REGISTRY["hybrid_rag"])
 
+    def test_register_surfaces_broken_runner_import(self, monkeypatch):
+        """Issue #33: if measurement.runner exists but `register_architecture`
+        can't be imported (e.g., a transitive import failed), `_register()`
+        must surface the ImportError — not silently pass.
+        """
+        import measurement.runner
+
+        from architectures.hybrid_rag.agent import _register
+
+        monkeypatch.delattr(measurement.runner, "register_architecture")
+        with pytest.raises(ImportError):
+            _register()
+
 
 # ---------------------------------------------------------------------------
 # End-to-end retrieval against real indices (slow)
