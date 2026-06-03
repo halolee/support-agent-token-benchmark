@@ -167,7 +167,7 @@ Full details in `METHODOLOGY.md`.
 
 ## Related work
 
-- [LangGraph customer support tutorial](https://github.com/langchain-ai/langgraph/blob/main/docs/docs/tutorials/customer-support/customer-support.ipynb) — Naive RAG is closely modeled on this; corpus and database forked from here.
+- LangGraph customer support tutorial — Naive RAG is closely modeled on this; corpus and database forked from here. The canonical tutorial path (`langchain-ai/langgraph` → `docs/docs/tutorials/customer-support/customer-support.ipynb`) was deprecated when the LangGraph docs were restructured; current docs index is at [docs.langchain.com/oss/python/langgraph](https://docs.langchain.com/oss/python/langgraph/overview). The original notebook is preserved in git history at that path. Corpus and database bytes are mirrored on this repo's [`data-mirror-v1` release](https://github.com/halolee/support-agent-token-benchmark/releases/tag/data-mirror-v1) — see issue [#19](https://github.com/halolee/support-agent-token-benchmark/issues/19).
 - [Silicon Data, _Understanding LLM Cost Per Token_](https://www.silicondata.com/blog/llm-cost-per-token) — Token decomposition methodology.
 - [SolDevelo, _A real-world test of RAG vs. Direct API calls_](https://soldevelo.com/blog/a-real-world-test-of-rag-vs-direct-api-calls/) — Independent measurement; relevant precedent.
 
