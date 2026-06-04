@@ -140,18 +140,72 @@ Three architectures measured, comparison report populated with real numbers, adv
 
 **Estimated effort:** 0.5 day
 
-### Step 11: Implement Cached RAG
+### Handover from v1 ship (2026-06-04) — read before starting
 
-- [ ] Copy `architectures/naive_rag/` to `architectures/naive_rag_cached/` (or add a `--cached` flag to the existing Naive RAG agent)
-- [ ] Enable prompt caching on the system prompt (always cacheable)
-- [ ] Enable caching on retrieved chunks when stable (this requires thinking about what "stable" means — chunks retrieved with same query are cacheable; different queries are not)
-- [ ] Document the caching configuration explicitly in the architecture README
+**Starting state:** v1 shipped at tag `measurement-v1`. Three architectures measured (Naive RAG, Grep search, Hybrid RAG). Cost ordering settled HIGH-confidence. Quality numbers LOW-confidence pending Finding C3 fix (v2 series, queued separately in `ROADMAP.md`). Phase 3 is sequenced **ahead of** the v2 quality re-measurement series because the v1 headline goal is *token cost*, and caching is the obvious cost optimization on the cheapest measured architecture — quantifying it answers the headline question directly. The v2 quality re-measurement settles a calibration question that does not affect the cost story; it stays scheduled but waits.
 
-### Step 12: Run and integrate
+**Read first, in order:**
+1. This Phase 3 spec below (Step 11–12).
+2. `measurement/results/comparison.md` §"Scope of measurement: the cache matrix" — the 4-of-6 cells v1 fills, and which v2 cells caching opens up.
+3. `architectures/naive_rag/README.md` — what Cached RAG extends.
+4. `METHODOLOGY.md` §"Model and configuration" — caching is enabled for Cached RAG only; disabled for the v1 measured three.
 
-- [ ] Run Cached RAG on the full task set, 3 runs
-- [ ] Add Cached RAG column to comparison report
+**Step 11 implementation shape — DECIDED 2026-06-04: Option A (clean separation).**
+- **Option A (chosen) — Copy `architectures/naive_rag/` to `architectures/cached_rag/`.** Methodology framing favors this: Cached RAG is a separately-named architecture in METHODOLOGY and `comparison.md`, not a config flag. Code duplication is the cost; clean divergence on caching-specific tuning is the benefit.
+- Option B (rejected) — `--cached` flag on the existing Naive RAG agent. Would conflate two architectures behind one identity in the judge and analysis paths.
+
+**Step 12 sweep protocol — DECIDED 2026-06-04: Option Y (cost-only, no re-judge).**
+- **Option Y (chosen) — Cached RAG alone (17 tasks × 3 runs = 51 dispatches), append-only, agent-side cost measurement only.** No judge re-run. Quality is asserted equivalent to Naive RAG by construction: prompt caching changes input-token *pricing*, not the tokens the model sees, and Sonnet 4.6 at `temperature=0.0` is deterministic on identical inputs. A 3-task spot-check (passing: caching fires + tool sequences match + responses semantically equivalent) is sufficient to validate the equivalence claim before reporting cost numbers. **Pre-sweep cost estimate from 3-task spot-check: ~$2.60 total** (mean $0.0506/run × 51 runs); the spot-check observed ~3,000 output tokens/task at $15/MTok, which is what made the earlier ~$1.50 placeholder undershoot. Full-sweep actuals settled materially lower in both directions: mean output 1,100 tokens/task (cross-task amortization brought the loop length down to typical) and total cost **$2.20** at mean $0.0432/run. For reference, v1 Naive RAG agent sweep cost $2.79 on the same 51 runs; Cached RAG saved $0.59 (**21%**) — see post-sweep numbers in `comparison.md`. The 7% savings the spot-check projected was a 3-task artifact; cache reuse compounds with sweep size.
+- Option X (rejected for this phase) — full 4-arch re-sweep with re-judging. Saves the methodology asterisk on the alternating-runs protocol, but the v2 quality re-measurement series is going to re-sweep with a *blinded* judge anyway (Finding C3). Doing a non-blinded re-judge now would burn ~$5 and produce numbers that get superseded by v2. Deferred to v2 when C1–C3 loose ends are tightened — the re-sweep then carries both the caching variant AND the blinded judge in a single methodology-clean run.
+
+**Implication to document in `comparison.md`:** Phase 3 reports Cached RAG cost columns and explicitly carries forward Naive RAG's quality numbers (with a footnote: "Quality assumed equivalent to Naive RAG; bit-identical-response spot-check confirms determinism. Re-judging deferred to v2 quality series."). The cache matrix table notes Cached RAG quality as `= Naive RAG (by construction)` rather than as an independent measurement.
+
+**Phase 3 ship status (2026-06-04):** Step 11 + 11.5 + 12 all shipped. Step 12 paid sweep completed at commit `f32ffe3` with **0 errors, 0 gate breaches, 51/51 dispatches caching-fired** (`cache_read_input_tokens > 0` on every run). Actual cost $2.20 (under the $2.60 estimate; mean $0.0432/run). Artifacts in `measurement/results/runs/2026-06-04-phase3-step12-cached-only/` (single-architecture sweep, append-only per Option Y).
+
+**Article-worthy finding:** Caching delivered **21% total-bill savings** vs Naive RAG (32% on the input side), with output tokens unchanged and now dominating the post-cache bill (38% of cached cost vs 28% of uncached). This is meaningfully larger than the 7% the 3-task spot-check projected, because cache writes amortize across all 51 dispatches' shared system+tools prefix. It is also meaningfully smaller than the pre-registered 50–80% hypothesis, which over-anchored on cache-read pricing without modeling the un-cached output share. **Framing for the LinkedIn article:** caching shifts cost *shape* (input near-free, output unchanged), not magnitude. See `comparison.md` §"Caching effect on cost" (Headline section) and §"Cached RAG cost-shape shift" (post-decomposition table) for the publication-ready treatment.
+
+**Process gotchas (carried forward from v1):**
+- `[[feedback-runner-report-clobbers-comparison]]` — do NOT run `python -m measurement.runner --report` until §11 template renderer ships (issue #42). Hand-edit `comparison.md`.
+- Frozen artifact rule: `architecture_*.json` and `judgments_*.json` under existing `runs/*/` dirs are read-only. Phase 3 output lands in a new dated dir.
+- `[[reference-anthropic-console]]` — API key disabled by default; re-enable before paid runs, disable after.
+- Finding C3 (judge architecture-label leak) is NOT fixed yet. Cached RAG's quality numbers will inherit the same calibration limit as v1; this is acceptable because Phase 3's headline is cost, not quality. The v2 series remains the canonical quality settlement work.
+
+**Hypothesis worth pre-registering** (so the article narrative has a frame either way):
+
+> Anthropic's prompt caching collapses cached-prefix input-token cost by ~90% on the cached portion (cache reads priced at ~$0.30/M vs $3/M list for Sonnet 4.6). Naive RAG's measured ① system prompt (1,693 mean) + ④ tool overhead (4,746 mean) — ~6,400 tokens — is the natural cache target. If retrieved chunks are stable for a non-trivial fraction of queries, ② retrieved_context (5,041 mean) joins the cacheable prefix. Expected outcome: Cached RAG median input cost drops 50–80% vs Naive RAG, depending on cache hit rate. If the drop is <30%, that's a methodology finding about prefix variability under realistic agent loops; publishable either way.
+
+**Exit criteria for Phase 3:**
+- Cached RAG cost measured via Option Y (append-only, 51 dispatches, no re-judge).
+- Caching-fires spot-check on ≥3 tasks: `cache_read_input_tokens > 0` on turn 2+, tool-call sequence matches Naive RAG, response semantically equivalent. (Not bit-identical — temp=0 server-side FP non-determinism makes byte-identical an unreliable bar; v1's 3-runs-and-median protocol exists for the same reason.)
+- `comparison.md` headline + per-class + decomposition tables populated for the Cached RAG cost columns; quality columns carry Naive RAG numbers with a `= Naive RAG (by construction)` footnote.
+- §"Confidence and known biases" Check 1 row for Cached RAG: confirm caching is configured to maximize stable-prefix reuse (not just enabled with defaults).
+- New tag `cached-rag-v1` on the Phase 3 ship commit, parallel to `measurement-v1`. Tag annotation includes the sweep dir provenance and notes "cost-only; quality carried over from Naive RAG."
+- `README.md` headline table updated; `HANDOVER.md` §6 + §9 amended; `ROADMAP.md` decision log entry added (record both the Y choice and the deferred X re-sweep).
+
+**v2 quality re-measurement series stays queued** in `ROADMAP.md` §"Quality re-measurement series." After Phase 3 ships, v2 is the natural next move — it would re-sweep with the blinded judge across all four architectures (Naive RAG, Cached RAG, Grep search, Hybrid RAG) in a single alternating run, settling both the architecture-quality story AND the methodology-clean protocol for Cached RAG in one pass. That is where the deferred Option X re-sweep lands.
+
+### Step 11: Implement Cached RAG (Option A — clean separation)
+
+- [ ] Copy `architectures/naive_rag/` to `architectures/cached_rag/` (full directory, including README, agent.py, system prompt, vector_store path)
+- [ ] Enable prompt caching on the system prompt (always cacheable — stable across all 51 tasks)
+- [ ] Enable caching on the tool definitions block (stable; ~4,746 mean tokens of overhead in v1 → high-leverage target)
+- [ ] Evaluate caching on retrieved chunks: chunks change per query, so the standard prefix-caching model does *not* cache them. Document this in the README as "retrieved_context is NOT cached; only the stable system prompt + tool definitions prefix is."
+- [ ] Update `architectures/cached_rag/README.md` to describe (a) what was copied from Naive RAG, (b) the caching configuration, (c) what is and isn't cached and why
+- [ ] Register `cached_rag` in `measurement/runner.py`'s architecture dispatch
+- [ ] Caching-fires spot-check (3 tasks, one each EASY/MID/EDGE) — proves caching is wired correctly, NOT bit-identical equivalence (agent runs at temp=0.0 but server-side FP non-determinism means temp=0 is close-but-not-byte-identical run-to-run; that's why v1 uses 3 runs + median). Pass criteria:
+   1. `cache_read_input_tokens > 0` on turn 2+ (caching fired)
+   2. Tool-call sequence matches Naive RAG's sequence on the same task (tool selection is much more stable than free-text output)
+   3. Response text reads as semantically equivalent to Naive RAG's response on the same task (sanity check by human review; rigorous quality settlement is v2's job)
+  If any of these fail, investigate before Step 12.
+
+### Step 12: Run and integrate (Option Y — cost-only, append-only)
+
+- [ ] Run Cached RAG on the full 51-task set, 3 runs (153 dispatches total) — single architecture, no alternation
+- [ ] Output lands in a new dated run dir (e.g., `runs/2026-MM-DD-phase3-step12-cached-only/`); v1 frozen dir is untouched
+- [ ] Skip judge sweep — quality columns inherit Naive RAG numbers
+- [ ] Add Cached RAG cost columns to `comparison.md` headline + per-class + decomposition tables; quality cells get `= Naive RAG` footnote
 - [ ] Update adversarial review to cover Cached RAG (Check 1: is caching configured to maximize stable-prefix reuse?)
+- [ ] Document the Option Y protocol asterisk in §"Confidence and known biases": single-architecture sweep, no alternation; time-of-day variance is a known limit on the Cached RAG cost numbers but does not affect the Naive RAG↔Cached RAG cost *delta* if it's large (>>variance)
 
 ### Phase 3 deliverable
 

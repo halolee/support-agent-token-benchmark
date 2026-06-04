@@ -84,11 +84,11 @@ flowchart LR
 
 ### Cached RAG
 
-Identical architecture to A. Anthropic prompt caching enabled on the system prompt and stable retrieved chunks. The caching is internal to AI Engineering's consumption — Support Content's tool is unchanged.
+Identical architecture to A. Anthropic prompt caching enabled on the system prompt and the tool-definitions block (the two largest stable categories — ① + ④ ≈ 6,400 tokens). Retrieved chunks (category ②) are *not* cached because they change per query. The caching is internal to AI Engineering's consumption — Support Content's tool is unchanged.
 
-**What changes:** AI Engineering's per-request cost drops dramatically (up to 90% on cached prefixes). The architecture's inter-team boundaries don't change.
+**What changes:** AI Engineering's per-request cost drops **21% on total bill** (mean $0.0432/run vs Naive RAG $0.0548 at list price), driven by a **32% reduction on the input side** where 44% of input tokens are billed at the $0.30/MTok cache-read rate vs the $3/MTok standard rate. Output cost is unchanged and dominates the post-caching bill (38% of cached cost vs 28% of uncached). The architecture's inter-team boundaries don't change.
 
-**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running Naive RAG in production today have caching enabled. Comparing Naive RAG without caching to anything else overstates Naive RAG's real cost.
+**What this surfaces:** Caching is an optimization within an architecture, not a separate architecture. Most teams running Naive RAG in production today have caching enabled. Comparing Naive RAG without caching to anything else overstates Naive RAG's real cost. The Phase 3 measurement also surfaces that **caching shifts cost shape, not magnitude** — the pre-registered 50–80% input-cost-reduction hypothesis over-anchored on the cache-read pricing without modeling the un-cached output share. For teams considering caching: budget for a ~20% per-request savings, not a cost collapse, and weight output-token-reduction work (shorter responses, better stop conditions) accordingly.
 
 ### Grep search
 
@@ -162,29 +162,31 @@ See `ARCHITECTURE_RATIONALE.md` for full discussion of why these are deferred to
 
 ## 6. Measurement results
 
-v1, Phase 2 sweep at commit `5a1a6e8` (2026-06-04), judge snapshot `1dda831`, task set `tasks-frozen-v1`. Full report in `measurement/results/comparison.md`; calibration findings in `measurement/results/runs/2026-06-04-phase2-step8b/judgment_summary.md`.
+v1: Phase 2 sweep at commit `5a1a6e8` (2026-06-04, three uncached architectures), judge snapshot `1dda831`, task set `tasks-frozen-v1`. Phase 3 Cached RAG sweep at commit `f32ffe3` (2026-06-04, append-only, no re-judge per Option Y). Full report in `measurement/results/comparison.md`; calibration findings in `measurement/results/runs/2026-06-04-phase2-step8b/judgment_summary.md`; Phase 3 sweep artifacts in `measurement/results/runs/2026-06-04-phase3-step12-cached-only/`.
 
 ### Summary across all task classes
 
-| Architecture | Median input tokens / task | Mean input tokens / task | Success rate (median of 3) | CoV across runs | Confidence |
-|--------------|---------------------------:|-------------------------:|---------------------------:|----------------:|------------|
-| **Naive RAG**    | **12,354** | 13,064 | **7/17 (41%)** | 6.3% | Cost: HIGH; Quality: MEDIUM |
-| Cached RAG   | (Phase 3) | — | — | — | Not measured |
-| Grep search  | 17,213 | 20,349 | 7/17 (41%) | 14.9% | Cost: HIGH; Quality: MEDIUM |
-| Hybrid RAG   | 13,312 | 16,291 | 6/17 (35%) | 11.7% | Cost: HIGH; Quality: LOW (Finding C3, see comparison.md) |
+| Architecture | Median input tokens / task | Mean input tokens / task | Mean cost / run (list) | Success rate (median of 3) | CoV across runs | Confidence |
+|--------------|---------------------------:|-------------------------:|-----------------------:|---------------------------:|----------------:|------------|
+| **Naive RAG**    | **12,354** | 13,064 | $0.0548 | **7/17 (41%)** | 6.3% | Cost: HIGH; Quality: MEDIUM |
+| **Cached RAG**   | 12,503 | 13,863 | **$0.0432 (−21%)** | = Naive RAG | 7.6% | Cost: HIGH; Quality: MEDIUM (by construction) |
+| Grep search  | 17,213 | 20,349 | $0.0779 | 7/17 (41%) | 14.9% | Cost: HIGH; Quality: MEDIUM |
+| Hybrid RAG   | 13,312 | 16,291 | $0.0657 | 6/17 (35%) | 11.7% | Cost: HIGH; Quality: LOW (Finding C3, see comparison.md) |
 
-Cost is contract-rate-dependent. Token ordering is mechanical (Anthropic API `usage.input_tokens` field) and contract-rate-independent.
+Cost is contract-rate-dependent. Token ordering is mechanical (Anthropic API `usage.input_tokens` / `cache_read_input_tokens` / `cache_creation_input_tokens` fields) and contract-rate-independent.
 
 ### Per-class breakdown
 
-Token costs (median input tokens per dispatch, including failed) and pass rates (out of 3 runs per task):
+Token costs (median input tokens per dispatch, including failed) and pass rates (out of 3 runs per task). For Cached RAG, "input tokens" = `api_input + cache_create + cache_read` (total tokens the model processed, before caching discount).
 
-| Class | Naive RAG tok / pass | Grep search tok / pass | Hybrid RAG tok / pass |
-|---|---:|---:|---:|
-| Policy (n=3) | 10,277 / 1-of-3 | 17,227 / 1-of-3 | 11,292 / 0-of-3 |
-| Transactional (n=3) | 8,651 / 2-of-3 | 8,990 / 2-of-3 | 8,735 / 1-of-3 |
-| Mixed (n=8) | 12,500 / 3-of-8 | 17,234 / 3-of-8 | 14,100 / 4-of-8 |
-| Edge (n=3) | 13,248 / 1-of-3 | 30,109 / 1-of-3 | 19,676 / 1-of-3 |
+| Class | Naive RAG tok / pass | Cached RAG tok / pass | Grep search tok / pass | Hybrid RAG tok / pass |
+|---|---:|---:|---:|---:|
+| Policy (n=3) | 10,277 / 1-of-3 | 10,262 / = Naive | 17,227 / 1-of-3 | 11,292 / 0-of-3 |
+| Transactional (n=3) | 8,651 / 2-of-3 | 8,657 / = Naive | 8,990 / 2-of-3 | 8,735 / 1-of-3 |
+| Mixed (n=8) | 12,500 / 3-of-8 | 12,990 / = Naive | 17,234 / 3-of-8 | 14,100 / 4-of-8 |
+| Edge (n=3) | 13,248 / 1-of-3 | 16,719 / = Naive | 30,109 / 1-of-3 | 19,676 / 1-of-3 |
+
+(Cached RAG's EDGE class median jumps to 16,719 because EDGE-003 ran 4 turns in 2/3 runs vs Naive's 3 — temp=0-not-byte-identical loop-length variance, not a caching cost penalty. See `comparison.md` §Edge case note.)
 
 **Where the architecture comparison actually lives:**
 - **Mixed tasks (47% of the task set)** are where production traffic concentrates. Hybrid RAG leads on pass rate (4/8 vs 3/8) at a modest +13% median cost premium over naive — the strongest case for hybrid's reranking. At current judge confidence (LOW for Hybrid RAG per Finding C3), the lift is suggestive, not definitive.
@@ -234,7 +236,9 @@ Recommendation grounded in v1 measured numbers and the §10 adversarial review f
 
 ### 9.1 Architecture to deploy first
 
-**Start with Naive RAG.** It is the cheapest measured architecture on per-task input tokens (median 12,354; +8% to +25% under Hybrid RAG depending on aggregation; +39% to +56% under Grep search). The cost advantage is robust — it does not depend on judge calibration choices, it does not depend on which tasks pass or fail, and it does not depend on known Hybrid RAG implementation bugs (the bugs are quality bugs; cost is bounded by the k=4 vs k=6 architectural choice). On pass rate it ties Grep search and is modestly above Hybrid RAG at current measurement confidence.
+**Start with Cached RAG (Naive RAG + prompt caching on system prompt + tool definitions).** It is the cheapest measured architecture at mean $0.0432/run — 21% under uncached Naive RAG and 34–45% under Hybrid RAG and Grep search at list price. Among uncached architectures, Naive RAG remains the recommendation if prompt caching is unavailable (median 12,354 input tokens; +8% to +25% under Hybrid RAG depending on aggregation; +39% to +56% under Grep search). On pass rate Cached RAG inherits Naive RAG's profile (= Naive RAG by construction; ties Grep search at 7/17, modestly above Hybrid RAG at current measurement confidence). The cost advantage is robust — it does not depend on judge calibration choices, it does not depend on which tasks pass or fail, and it does not depend on known Hybrid RAG implementation bugs (the bugs are quality bugs; cost is bounded by the k=4 vs k=6 architectural choice).
+
+**Realistic expectations on caching:** Caching shifts cost *shape*, not magnitude — output tokens go from 28% to 38% of the bill once input is cached. Budget for a ~20% per-request savings, not the 50–80% input-cost-reduction headline that surface readings of Anthropic's pricing might suggest. Output-token-reduction work (shorter responses, better stop conditions) is the natural next optimization once caching is enabled.
 
 This recommendation is conditional on the workload class measured: enterprise customer support on a structured policy corpus (~30 chunks), single-turn dialogue, Sonnet-4.6-tier reasoning. The conditional applies because v1 explicitly does not measure (a) larger corpora where Hybrid RAG's quality edge may compound, (b) multi-turn dialogue where caching effects start to dominate, (c) other model tiers where cheaper-model interactions with retrieved-context length could re-rank the architectures.
 
@@ -255,13 +259,13 @@ The recommendation explicitly *does* preclude Grep search as the primary deploym
 - **Multi-turn dialogue.** Single-turn only.
 - **Voice / streaming channels.** Text only.
 - **Multi-language.** English only.
-- **Caching effects beyond the architectural baseline.** Cached RAG is Phase 3.
+- **Caching effects on Grep search and Hybrid RAG.** v1 measures the caching effect on Naive RAG (Cached RAG, Phase 3). The companion question — does the 21% savings extend to Grep and Hybrid — is queued for v2 (the remaining two cells of the cache matrix).
 - **Adaptation cost** when the corpus changes. Beyond v2 (`ROADMAP.md`).
 - **Production-grade security and governance.** §8 enumerates these as out of scope for the measurement experiment; a production deployment would need to address each.
 
 ### 9.4 Confidence
 
-- **Cost ordering Naive < Hybrid < Grep: HIGH confidence.** Mechanical token measurements; robust to filtering and to known bug status.
+- **Cost ordering Cached < Naive < Hybrid < Grep: HIGH confidence.** Mechanical token measurements; robust to filtering, to known bug status, and to caching configuration. Caching's 21% savings on Naive RAG is measured directly via `cache_read_input_tokens` / `cache_creation_input_tokens` from the Anthropic API.
 - **Quality differences between architectures: LOW confidence.** Contaminated by Finding C3 (judge architecture-label leak). Treat current pass rates as preliminary; the v2 re-measurement is the next step. Full confidence rubric in `comparison.md` §"Net confidence statement."
 
 ### 9.5 What this recommendation is

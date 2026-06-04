@@ -243,6 +243,97 @@ class TestRunSmoke:
 
 
 # =========================================================================
+# _gate_ratio — caching-aware comparison
+# =========================================================================
+
+
+class TestGateRatio:
+    """The decomposition gate compares the count_tokens-derived input sum to
+    the API-reported "actually processed" total. Anthropic reports cache
+    tokens on separate counters (cache_creation_input_tokens,
+    cache_read_input_tokens), so the gate denominator must be the SUM of
+    api_input + cache_create + cache_read — not api_input alone — otherwise
+    every cached_rag record trips a false-alarm breach. See METHODOLOGY
+    §"Cached RAG cost model" and the Phase 3 spot-check evidence on
+    2026-06-04 (three records all passing 5% under the corrected logic).
+    """
+
+    def test_uses_api_input_when_no_caching(self):
+        from measurement.runner import _gate_ratio
+
+        record = {
+            "api_input_tokens": 1000,
+            "decomposition_input_sum": 1020,
+            "decomposition_input_sum_with_audit": 1020,  # 2% over
+        }
+        assert abs(_gate_ratio(record) - 0.02) < 1e-6
+
+    def test_includes_cache_tokens_in_denominator(self):
+        from measurement.runner import _gate_ratio
+
+        # Spot-check POL-001 actuals (2026-06-04, Phase 3 §11): inclusive=
+        # 10175, api=4551, cache_create=2408, cache_read=3324. Total
+        # processed = 10283. Ratio = |10175 - 10283| / 10283 ≈ 1.05%.
+        record = {
+            "api_input_tokens": 4551,
+            "cache_creation_input_tokens": 2408,
+            "cache_read_input_tokens": 3324,
+            "decomposition_input_sum": 9678,
+            "decomposition_input_sum_with_audit": 10175,
+        }
+        ratio = _gate_ratio(record)
+        assert ratio < 0.05, (
+            f"Caching-aware gate should pass on cached record; got "
+            f"ratio={ratio:.4f} (expected ≈ 0.0105)"
+        )
+        assert abs(ratio - 0.0105) < 1e-3
+
+    def test_falls_back_to_decomposition_input_sum_when_audit_missing(self):
+        """Single-turn smoke records don't emit
+        `decomposition_input_sum_with_audit`. The gate should still work,
+        using the audit-excluded sum.
+        """
+        from measurement.runner import _gate_ratio
+
+        record = {
+            "api_input_tokens": 1000,
+            "decomposition_input_sum": 1010,  # 1% over
+        }
+        assert abs(_gate_ratio(record) - 0.01) < 1e-6
+
+    def test_zero_total_returns_zero(self):
+        """Defensive: a record with no input tokens at all (degenerate)
+        must not raise ZeroDivisionError.
+        """
+        from measurement.runner import _gate_ratio
+
+        record = {
+            "api_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "decomposition_input_sum": 0,
+            "decomposition_input_sum_with_audit": 0,
+        }
+        assert _gate_ratio(record) == 0.0
+
+    def test_handles_none_cache_field_values(self):
+        """Defensive: some result-file shapes store explicit None instead
+        of 0 for the cache fields when the architecture doesn't use
+        caching. The `or 0` guard must collapse both to 0.
+        """
+        from measurement.runner import _gate_ratio
+
+        record = {
+            "api_input_tokens": 1000,
+            "cache_creation_input_tokens": None,
+            "cache_read_input_tokens": None,
+            "decomposition_input_sum": 1020,
+            "decomposition_input_sum_with_audit": 1020,
+        }
+        assert abs(_gate_ratio(record) - 0.02) < 1e-6
+
+
+# =========================================================================
 # --report
 # =========================================================================
 

@@ -1,6 +1,6 @@
 # support-agent-token-benchmark
 
-**Status: v1 (Phase 2 ship, 2026-06-04).** Three retrieval architectures measured (Naive RAG, Grep search, Hybrid RAG); cost numbers HIGH confidence; quality numbers LOW confidence pending v2 (see `ROADMAP.md` §"Quality re-measurement series"). Cached RAG is Phase 3 (deferred). Headline summary below; full report in `measurement/results/comparison.md`. Tag: `measurement-v1`.
+**Status: v1 (Phase 3 ship, 2026-06-04).** Four retrieval architectures measured (Naive RAG, Cached RAG, Grep search, Hybrid RAG); cost numbers HIGH confidence; quality numbers LOW confidence pending v2 (see `ROADMAP.md` §"Quality re-measurement series"). Cached RAG was added in Phase 3 via Option Y (cost-only, no re-judge; quality inherited from Naive RAG by construction). Headline summary below; full report in `measurement/results/comparison.md`. Tags: `measurement-v1` (Phase 2 baseline), `cached-rag-v1` (Phase 3).
 
 A measurement framework for comparing retrieval architectures used in LLM-based customer support agents, under realistic enterprise constraints. Built as the empirical foundation for a companion LinkedIn article on AI architecture trade-offs.
 
@@ -102,9 +102,8 @@ pip install -r requirements.txt
 # Set your API key
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Run the benchmark on the three v1 measured architectures
-# (Cached RAG is Phase 3; not yet implemented)
-python -m measurement.runner --architectures naive_rag,grep_search,hybrid_rag --tasks measurement/tasks.jsonl --runs 3
+# Run the benchmark on the four v1 measured architectures
+python -m measurement.runner --architectures naive_rag,cached_rag,grep_search,hybrid_rag --tasks measurement/tasks.jsonl --runs 3
 
 # Score with the LLM-as-judge
 python -m measurement.judge --runs-dir measurement/results/runs/<your-dated-dir>
@@ -114,7 +113,7 @@ python -m measurement.judge --runs-dir measurement/results/runs/<your-dated-dir>
 # (issue #42, fix tracked as §11 template renderer).
 ```
 
-Expected runtime: ~30 minutes for the full task set + judge across the three measured architectures.
+Expected runtime: ~45 minutes for the full task set + judge across the four measured architectures (or ~30 minutes for the three uncached architectures only).
 
 ## Repository structure
 
@@ -132,7 +131,8 @@ Expected runtime: ~30 minutes for the full task set + judge across the three mea
 │   └── travel.sqlite                  # Booking data (sourced from LangGraph tutorial)
 ├── architectures/
 │   ├── naive_rag/                   # Vector store + top-K retrieval
-│   ├── grep_search/                        # Keyword search as a tool
+│   ├── cached_rag/                  # Naive RAG + Anthropic prompt caching
+│   ├── grep_search/                 # Keyword search as a tool
 │   └── hybrid_rag/                  # Vector + BM25 + reranking
 ├── architectures_deferred/            # Placeholders for Bounded tools and Stuffed corpus (v2)
 ├── measurement/
@@ -148,16 +148,20 @@ Expected runtime: ~30 minutes for the full task set + judge across the three mea
 
 ## Headline results
 
-v1, Phase 2 measurement (sweep `5a1a6e8`, judge snapshot `1dda831`, task set `tasks-frozen-v1`):
+v1, Phase 3 measurement (v1 sweep `5a1a6e8`, judge snapshot `1dda831`, Phase 3 Cached RAG sweep `f32ffe3`, task set `tasks-frozen-v1`):
 
-| Architecture | Median input tokens / task | Mean input tokens / task | Success rate (median of 3) | CoV across runs |
-|--------------|---------------------------:|-------------------------:|---------------------------:|----------------:|
-| **Naive RAG**    | **12,354** | 13,064 | **7/17 (41%)** | 6.3% |
-| Cached RAG   | (Phase 3 — not measured) | — | — | — |
-| Grep search  | 17,213 | 20,349 | 7/17 (41%) | 14.9% |
-| Hybrid RAG   | 13,312 | 16,291 | 6/17 (35%) | 11.7% |
+| Architecture | Median input tokens / task | Mean input tokens / task | Success rate (median of 3) | CoV across runs | Mean cost / run (list price) |
+|--------------|---------------------------:|-------------------------:|---------------------------:|----------------:|-----------------------------:|
+| **Naive RAG**    | **12,354** | 13,064 | **7/17 (41%)** | 6.3% | $0.0548 |
+| **Cached RAG**   | 12,503 | 13,863 | = Naive RAG ¹ | 7.6% | **$0.0432** (−21%) |
+| Grep search  | 17,213 | 20,349 | 7/17 (41%) | 14.9% | $0.0779 |
+| Hybrid RAG   | 13,312 | 16,291 | 6/17 (35%) | 11.7% | $0.0657 |
 
-**Cost story (HIGH confidence):** Naive RAG is cheapest. Hybrid RAG +8% median / +25% mean. Grep search +39% median / +56% mean. Ordering is robust to filtering choice, robust to known Hybrid RAG retrieval bugs (which affect quality not cost), and within architectural explanation (vector_search k=4 < hybrid_search k=6 < grep_corpus variable lines).
+¹ Cached RAG quality = Naive RAG by construction (Option Y; prompt caching changes pricing, not the tokens the model sees). Re-judging deferred to v2.
+
+**Cost story (HIGH confidence):** Among uncached architectures, Naive RAG is cheapest. Hybrid RAG +8% median / +25% mean. Grep search +39% median / +56% mean. Ordering is robust to filtering choice, robust to known Hybrid RAG retrieval bugs (which affect quality not cost), and within architectural explanation (vector_search k=4 < hybrid_search k=6 < grep_corpus variable lines).
+
+**Caching effect (HIGH confidence — Phase 3):** Prompt caching on Naive RAG (system prompt + tool definitions cached, retrieved context not) drops per-run cost by 21% (from $0.0548 to $0.0432). The savings are 32% on the input side; output cost is unchanged and now dominates (38% of cached bill vs 28% of uncached). Caching shifts cost *shape*, not total magnitude — the pre-registered 50–80% input-cost-reduction hypothesis over-anchored on cache-read pricing without modeling the un-cached output share.
 
 **Quality story (LOW confidence — preliminary):** All three architectures cluster in a 35–41% pass-rate band. During §10 adversarial review we identified a methodology defect (Finding C3: the LLM-as-judge prompt embeds the architecture name, producing asymmetric scoring strictness). The 6-point spread is *within* the unquantified label-leakage effect and should not be read as architecture-quality ranking. A v2 measurement cycle (blinded judge + Hybrid RAG bug fixes) is queued in `ROADMAP.md`.
 
