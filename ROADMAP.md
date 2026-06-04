@@ -32,6 +32,26 @@ The principle: ship the load-bearing comparison first. Add scope when v1 results
 
 These are deliberately deferred from v1. Each has a specific trigger condition for being promoted to v2 scope.
 
+### Quality re-measurement series (committed for v2 — no trigger condition required)
+
+v1 ships with HIGH-confidence cost findings and LOW-confidence quality findings. The §10 adversarial review (see `measurement/results/comparison.md` §"Confidence and known biases" and `measurement/results/runs/2026-06-04-phase2-step8b/judgment_summary.md` §"Manual review findings") identified a methodology defect (Finding C3: the LLM-as-judge prompt embeds the architecture name, producing asymmetric scoring strictness) plus five open Hybrid RAG retrieval bugs. The cost numbers are independent of both; quality numbers are not.
+
+This is a quality-focused v2 series, distinct from the cost-focused architectures-deferred items below.
+
+- **Trigger to add:** committed. Not gated on v1 reception — the §10 review explicitly states quality numbers are preliminary until this series ships.
+- **Required fixes before re-sweep:**
+  - **C3 fix** — strip `architecture`, `run_index`, and `tools_called` from `_build_agent_suffix` in `measurement/judge.py:236-256`. One-line PR. Blinds the judge to architecture identity per LLM-as-judge best practice.
+  - **Hybrid RAG bug fixes** — issues #29 (BM25 accent tokenizer), #30 (RRF tie-break vector-favored), #31 (reranker 512-token silent truncation), #32 (BM25 early-break on negative-IDF chunks). Issue #35 is preventive only (no current code path triggers it) and can be deferred.
+- **Required protocol:** re-sweep all three architectures in a single alternating run per METHODOLOGY §"Run protocol" — a hybrid-alone rerun against the v1 naive/grep numbers would break the time-of-day control and is explicitly NOT recommended (see `judgment_summary.md` §"Implications for §10").
+- **Re-judge:** the full 153 dispatches with the blinded judge prompt. Plus a fresh 10% manual review sample to verify the C3 fix landed cleanly.
+- **Estimated additional work:** ~0.5 day for the fixes (one-line judge PR + per-bug Hybrid RAG fix); ~1 day for the re-sweep + re-judge + `comparison.md` quality-section update + LinkedIn-article amendment.
+- **Estimated paid cost:** ~$13 (re-sweep ~$6.50, re-judge ~$6.50 — same magnitude as the Phase 2 sweep).
+- **Deliverables:**
+  - Updated `comparison.md` with blinded-judge quality numbers replacing the LOW-confidence cells.
+  - Companion LinkedIn-article follow-up "Quality, properly measured" using the same data with the methodology fix as the narrative hook.
+  - `judgment_summary.md` for the v2 sweep showing whether the C3 finding closes (pass rate spread tightens) and whether the hybrid bug fixes show up as quality lift.
+- **Article framing:** v2 becomes a content series — v1's headline is "we measured cost cleanly and found Naive cheapest"; v2's headline is "we measured the judge, found a leak, fixed it, and re-measured quality." This is a methodology contribution, not a retraction. Most LLM-as-judge writeups don't surface this kind of self-criticism.
+
 ### Bounded tools
 
 - **Trigger to add:** Reviewers or readers argue thatBounded tools and Hybrid RAGare meaningfully different in cost or success rate, and the comparison would benefit from distinguishing them.
@@ -134,6 +154,7 @@ Significant scope decisions and their rationale:
 | 2026-05-25 | Added "corpus/data evolution axis" to Beyond v2 | Surfaced during Phase 1 Step 0 corpus inventory. The bucket's travel→travel2 evolution suggested an adaptation-cost experimental axis distinct from per-call token cost. Flagged as a good contributor fit for the open-source v2+. |
 | 2026-05-25 | Stay Python for v1; .NET reference implementation noted as Beyond-v2 candidate | Solo-founder runway considerations favor the language ecosystem with mature AI tooling — even Microsoft pushes Python for Azure AI Foundry and Semantic Kernel's Python flavor. The methodology is language-invariant, so .NET-shaped enterprise readers can map architectures to their stack via the component mapping in the Beyond-v2 entry. The article will include a "mapping to .NET ecosystem" paragraph for that audience. |
 | 2026-06-02 | Froze benchmark task set at 17/17 (3 POL, 3 TXN, 8 MIX, 3 EDGE) | Merge of [#16](https://github.com/halolee/support-agent-token-benchmark/pull/16) (commit `e5f8c43`); also tagged `tasks-frozen-v1`. All measured architectures run against this set. Anchor for reproducibility — the published numbers in `comparison.md` are tied to this task set. Edits create new IDs and deprecate old ones per CLAUDE.md invariants. |
+| 2026-06-04 | Ship v1 §10 with cost-confident / quality-preliminary framing; queue v2 quality re-measurement series | Phase 2 §10 adversarial review surfaced Finding C3 (judge prompt embeds architecture name, contaminating quality scoring) plus a stability test confirming asymmetric judge strictness across architectures. Cost numbers are HIGH-confidence (mechanical at API level, robust to bug status and filtering); quality numbers are LOW-confidence and contaminated by C3. Decision: ship v1 with HIGH-confidence cost findings as the headline and LOW-confidence quality findings front-loaded with the C3 caveat. v2 series (blinded judge + Hybrid RAG bug fixes + full re-sweep + re-judge, ~$13) committed above the v2 trigger-condition items. Article framing becomes a "cost + methodology" v1 headline and "quality, properly measured" v2 follow-up. Reasoning fully documented in `comparison.md` §"Confidence and known biases" and `runs/2026-06-04-phase2-step8b/judgment_summary.md`. |
 
 ## How this document gets updated
 
