@@ -1,6 +1,6 @@
 # Handover Document — Customer Support Agent
 
-**Status:** Draft for review — this is a *worked example* of a deployment-readiness conversation, not the v1 experiment's approval gate
+**Status:** v1 — Phase 2 ship (2026-06-04). Worked example of a deployment-readiness conversation, NOT the v1 experiment's approval gate. Recommendation section populated against measured numbers.
 **From:** AI Engineering
 **To:** Platform Operations, Support Content, Booking Systems, Compliance
 **Purpose:** Document the architectures evaluated, the cross-team dependencies of each, and the recommended deployment path with honest trade-offs surfaced.
@@ -162,22 +162,35 @@ See `ARCHITECTURE_RATIONALE.md` for full discussion of why these are deferred to
 
 ## 6. Measurement results
 
-> _To be populated after measurement runs. Structure below indicates what will be reported._
+v1, Phase 2 sweep at commit `5a1a6e8` (2026-06-04), judge snapshot `1dda831`, task set `tasks-frozen-v1`. Full report in `measurement/results/comparison.md`; calibration findings in `measurement/results/runs/2026-06-04-phase2-step8b/judgment_summary.md`.
 
 ### Summary across all task classes
 
-| Architecture | Mean total tokens / task | Mean cost / task | Cost / 10K tasks | Success rate | Mean latency |
-|--------------|--------------------------|------------------|------------------|--------------|--------------|
-| Naive RAG    | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| Cached RAG   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| Grep search  | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
-| Hybrid RAG   | _TBD_                    | $_TBD_           | $_TBD_           | _TBD_%       | _TBD_s       |
+| Architecture | Median input tokens / task | Mean input tokens / task | Success rate (median of 3) | CoV across runs | Confidence |
+|--------------|---------------------------:|-------------------------:|---------------------------:|----------------:|------------|
+| **Naive RAG**    | **12,354** | 13,064 | **7/17 (41%)** | 6.3% | Cost: HIGH; Quality: MEDIUM |
+| Cached RAG   | (Phase 3) | — | — | — | Not measured |
+| Grep search  | 17,213 | 20,349 | 7/17 (41%) | 14.9% | Cost: HIGH; Quality: MEDIUM |
+| Hybrid RAG   | 13,312 | 16,291 | 6/17 (35%) | 11.7% | Cost: HIGH; Quality: LOW (Finding C3, see comparison.md) |
+
+Cost is contract-rate-dependent. Token ordering is mechanical (Anthropic API `usage.input_tokens` field) and contract-rate-independent.
 
 ### Per-class breakdown
 
-The interesting question is whether different architectures suit different task classes. If one architecture is uniformly best, the choice is straightforward. If Cached RAG wins on cost but loses on edge cases, or Grep search wins on simple queries but fails on mixed ones, the right answer depends on production traffic shape.
+Token costs (median input tokens per dispatch, including failed) and pass rates (out of 3 runs per task):
 
-> _Per-class tables to be populated._
+| Class | Naive RAG tok / pass | Grep search tok / pass | Hybrid RAG tok / pass |
+|---|---:|---:|---:|
+| Policy (n=3) | 10,277 / 1-of-3 | 17,227 / 1-of-3 | 11,292 / 0-of-3 |
+| Transactional (n=3) | 8,651 / 2-of-3 | 8,990 / 2-of-3 | 8,735 / 1-of-3 |
+| Mixed (n=8) | 12,500 / 3-of-8 | 17,234 / 3-of-8 | 14,100 / 4-of-8 |
+| Edge (n=3) | 13,248 / 1-of-3 | 30,109 / 1-of-3 | 19,676 / 1-of-3 |
+
+**Where the architecture comparison actually lives:**
+- **Mixed tasks (47% of the task set)** are where production traffic concentrates. Hybrid RAG leads on pass rate (4/8 vs 3/8) at a modest +13% median cost premium over naive — the strongest case for hybrid's reranking. At current judge confidence (LOW for Hybrid RAG per Finding C3), the lift is suggestive, not definitive.
+- **Transactional control** is the cost-floor — all three architectures within 5% of each other when retrieval workload is minimal.
+- **Edge cases** inflate cost dramatically for grep (+127% over naive) and hybrid (+48%). Driven mostly by EDGE-001 (the safety-floor probe). Universal failure on EDGE-001 is methodology-gate-by-design, not architecture-discriminating.
+- **Pure policy** is where grep shows its widest cost premium (+68% over naive). On the class where vector RAG is theoretically strongest, the cost gap is largest.
 
 ---
 
@@ -217,16 +230,43 @@ This enumeration is the credibility move. The experiment does not claim to addre
 
 ## 9. Recommended path forward
 
-> _To be filled in after measurement results are known. The recommendation depends on the measured trade-offs._
+Recommendation grounded in v1 measured numbers and the §10 adversarial review findings.
 
-The recommendation will state:
+### 9.1 Architecture to deploy first
 
-1. **Which architecture to deploy first**, with rationale grounded in measured numbers and the operational/organizational reality of current team boundaries.
-2. **What conditions would change the recommendation** — e.g., if traffic patterns shift, if Support Content changes their operational model, if a different cost sensitivity dominates.
-3. **What we are explicitly not optimizing for in v1** — multi-turn, voice channel, multi-language.
-4. **Honest confidence level**, per the adversarial review in `comparison.md`.
+**Start with Naive RAG.** It is the cheapest measured architecture on per-task input tokens (median 12,354; +8% to +25% under Hybrid RAG depending on aggregation; +39% to +56% under Grep search). The cost advantage is robust — it does not depend on judge calibration choices, it does not depend on which tasks pass or fail, and it does not depend on known Hybrid RAG implementation bugs (the bugs are quality bugs; cost is bounded by the k=4 vs k=6 architectural choice). On pass rate it ties Grep search and is modestly above Hybrid RAG at current measurement confidence.
 
-The recommendation is not a final decision. It is an input to the cross-team conversation that Support Operations, Compliance, Booking Systems, and AI Engineering leadership need to have together.
+This recommendation is conditional on the workload class measured: enterprise customer support on a structured policy corpus (~30 chunks), single-turn dialogue, Sonnet-4.6-tier reasoning. The conditional applies because v1 explicitly does not measure (a) larger corpora where Hybrid RAG's quality edge may compound, (b) multi-turn dialogue where caching effects start to dominate, (c) other model tiers where cheaper-model interactions with retrieved-context length could re-rank the architectures.
+
+The recommendation does *not* preclude Hybrid RAG. Hybrid RAG's measured cost premium is real and architectural (k=6 vs k=4 chunks for the reranker). Whether the premium buys quality is currently LOW-confidence because of Finding C3 (`comparison.md` §"Confidence and known biases" and `judgment_summary.md` §"Manual review findings"). A v2 measurement cycle with a blinded judge prompt and Hybrid RAG bug fixes is queued in `ROADMAP.md` §"Quality re-measurement series" and will settle the quality story before any quality-vs-cost recommendation upgrade for Hybrid RAG.
+
+The recommendation explicitly *does* preclude Grep search as the primary deployment for this workload class on cost grounds. Grep is +39% median / +56% mean over Naive at the same pass rate. The grep-specific quality properties that the current rubric does not measure (safety-floor behavior on suspect content, audit-trail inspectability) may justify grep in narrower contexts (compliance-heavy workloads, environments where no vector store is operationally tenable), but those would need a different measurement framing.
+
+### 9.2 Conditions that would change the recommendation
+
+- **Larger corpus (thousands of chunks):** BGE-M3 vector retrieval quality degrades with corpus size; BM25 exact-match advantage grows. The cost/quality tradeoff likely shifts toward Hybrid RAG. v1 cannot extrapolate; a follow-on benchmark on a 10× larger corpus would be the test.
+- **Multi-turn dialogue:** category ⑤ (agent intermediate) compounds across turns. Naive RAG's per-turn agent_intermediate is the smallest of the three (mean 638 vs hybrid 685 vs grep 816). The naive advantage likely *strengthens* under multi-turn. This recommendation extends.
+- **Workload dominated by exact-string lookups** (specific section names, identifiers): BM25 and grep gain a quality edge that pure vector retrieval doesn't. Recommendation would shift toward Hybrid RAG (BM25 + reranker) or grep.
+- **Sonnet 4.6 is too expensive for the volume:** moving to Haiku 4.5 may interact differently with retrieved context length. v1 does not extrapolate to other models.
+- **Operational reality where Support Content cannot maintain a vector store:** Naive RAG and Hybrid RAG both require Support Content to run an indexing pipeline. If that's organizationally infeasible, Grep search becomes attractive despite its cost premium.
+
+### 9.3 What we are explicitly not optimizing for in v1
+
+- **Multi-turn dialogue.** Single-turn only.
+- **Voice / streaming channels.** Text only.
+- **Multi-language.** English only.
+- **Caching effects beyond the architectural baseline.** Cached RAG is Phase 3.
+- **Adaptation cost** when the corpus changes. Beyond v2 (`ROADMAP.md`).
+- **Production-grade security and governance.** §8 enumerates these as out of scope for the measurement experiment; a production deployment would need to address each.
+
+### 9.4 Confidence
+
+- **Cost ordering Naive < Hybrid < Grep: HIGH confidence.** Mechanical token measurements; robust to filtering and to known bug status.
+- **Quality differences between architectures: LOW confidence.** Contaminated by Finding C3 (judge architecture-label leak). Treat current pass rates as preliminary; the v2 re-measurement is the next step. Full confidence rubric in `comparison.md` §"Net confidence statement."
+
+### 9.5 What this recommendation is
+
+An input to the cross-team conversation that Support Operations, Compliance, Booking Systems, and AI Engineering leadership need to have together. Not a final decision. The §10 sign-off table below names the stakeholders that conversation would include.
 
 ---
 

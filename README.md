@@ -1,5 +1,7 @@
 # support-agent-token-benchmark
 
+**Status: v1 (Phase 2 ship, 2026-06-04).** Three retrieval architectures measured (Naive RAG, Grep search, Hybrid RAG); cost numbers HIGH confidence; quality numbers LOW confidence pending v2 (see `ROADMAP.md` §"Quality re-measurement series"). Cached RAG is Phase 3 (deferred). Headline summary below; full report in `measurement/results/comparison.md`. Tag: `measurement-v1`.
+
 A measurement framework for comparing retrieval architectures used in LLM-based customer support agents, under realistic enterprise constraints. Built as the empirical foundation for a companion LinkedIn article on AI architecture trade-offs.
 
 ## What this project is
@@ -100,14 +102,19 @@ pip install -r requirements.txt
 # Set your API key
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# Run the benchmark on all v1 architectures
-python measurement/runner.py --architectures naive_rag,cached_rag,grep_search,hybrid_rag --tasks measurement/tasks.jsonl
+# Run the benchmark on the three v1 measured architectures
+# (Cached RAG is Phase 3; not yet implemented)
+python -m measurement.runner --architectures naive_rag,grep_search,hybrid_rag --tasks measurement/tasks.jsonl --runs 3
 
-# Generate the comparison report
-python measurement/runner.py --report
+# Score with the LLM-as-judge
+python -m measurement.judge --runs-dir measurement/results/runs/<your-dated-dir>
+
+# Do NOT run `python -m measurement.runner --report` — it overwrites the
+# hand-authored comparison.md including the §10 adversarial-review narrative
+# (issue #42, fix tracked as §11 template renderer).
 ```
 
-Expected runtime: ~8–10 minutes for the full task set across all four architectures.
+Expected runtime: ~30 minutes for the full task set + judge across the three measured architectures.
 
 ## Repository structure
 
@@ -141,16 +148,20 @@ Expected runtime: ~8–10 minutes for the full task set across all four architec
 
 ## Headline results
 
-> _To be populated after measurement runs. Structure below indicates what will be reported._
+v1, Phase 2 measurement (sweep `5a1a6e8`, judge snapshot `1dda831`, task set `tasks-frozen-v1`):
 
-| Architecture | Mean tokens / task | Cost / task | Success rate | Mean latency |
-|--------------|--------------------|-------------|--------------|--------------|
-| Naive RAG    | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| Cached RAG   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| Grep search  | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
-| Hybrid RAG   | _TBD_              | _TBD_       | _TBD_        | _TBD_        |
+| Architecture | Median input tokens / task | Mean input tokens / task | Success rate (median of 3) | CoV across runs |
+|--------------|---------------------------:|-------------------------:|---------------------------:|----------------:|
+| **Naive RAG**    | **12,354** | 13,064 | **7/17 (41%)** | 6.3% |
+| Cached RAG   | (Phase 3 — not measured) | — | — | — |
+| Grep search  | 17,213 | 20,349 | 7/17 (41%) | 14.9% |
+| Hybrid RAG   | 13,312 | 16,291 | 6/17 (35%) | 11.7% |
 
-Per-task-class breakdowns and the full discussion are in `measurement/results/comparison.md`.
+**Cost story (HIGH confidence):** Naive RAG is cheapest. Hybrid RAG +8% median / +25% mean. Grep search +39% median / +56% mean. Ordering is robust to filtering choice, robust to known Hybrid RAG retrieval bugs (which affect quality not cost), and within architectural explanation (vector_search k=4 < hybrid_search k=6 < grep_corpus variable lines).
+
+**Quality story (LOW confidence — preliminary):** All three architectures cluster in a 35–41% pass-rate band. During §10 adversarial review we identified a methodology defect (Finding C3: the LLM-as-judge prompt embeds the architecture name, producing asymmetric scoring strictness). The 6-point spread is *within* the unquantified label-leakage effect and should not be read as architecture-quality ranking. A v2 measurement cycle (blinded judge + Hybrid RAG bug fixes) is queued in `ROADMAP.md`.
+
+Per-task-class breakdowns, full token decomposition, variance reporting, and the complete §10 confidence narrative are in `measurement/results/comparison.md`.
 
 ## Methodology summary
 
