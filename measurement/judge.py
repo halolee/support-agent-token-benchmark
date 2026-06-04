@@ -52,9 +52,17 @@ except ImportError:
 # METHODOLOGY §"Model and configuration": judge is opus 4.7 dateless ID.
 JUDGE_MODEL = "claude-opus-4-7"
 
-# Judge call is deterministic — same rubric + same response should yield
-# the same score. temperature=0.0 keeps repeated runs reproducible.
-JUDGE_TEMPERATURE = 0.0
+# `claude-opus-4-7` does not accept the `temperature` parameter (400
+# BadRequestError: "`temperature` is deprecated for this model"),
+# discovered on the first paid dry-run. Per METHODOLOGY §"Model and
+# configuration" only the agent run is pinned to temperature=0; the
+# judge has no methodology-required temperature, so we let the model
+# default (sampling enabled). Judge calibration relies on the 10%
+# manual review per METHODOLOGY §"LLM-as-judge scoring" rather than
+# strict per-call reproducibility. Constant retained for the
+# `judge_temperature` config field (records "default" so the cause of
+# any cross-run variance is explicit in the side-car).
+JUDGE_TEMPERATURE: float | None = None
 
 # Output cap. Judge returns a small JSON object + 1-3 sentence rationale;
 # 1024 is comfortably above what any score block needs but small enough
@@ -442,17 +450,20 @@ def judge_one(
     ]
     messages = [{"role": "user", "content": user_content}]
 
+    create_kwargs: dict[str, Any] = {
+        "model": JUDGE_MODEL,
+        "max_tokens": JUDGE_MAX_TOKENS,
+        "system": system_blocks,
+        "messages": messages,
+    }
+    if JUDGE_TEMPERATURE is not None:
+        create_kwargs["temperature"] = JUDGE_TEMPERATURE
+
     attempts = 0
     while True:
         attempts += 1
         try:
-            response = client.messages.create(
-                model=JUDGE_MODEL,
-                max_tokens=JUDGE_MAX_TOKENS,
-                temperature=JUDGE_TEMPERATURE,
-                system=system_blocks,
-                messages=messages,
-            )
+            response = client.messages.create(**create_kwargs)
             break
         except Exception as e:
             if attempts > _MAX_RETRIES or not _is_retriable(e):
@@ -591,26 +602,35 @@ def _resolve_runs_per_task(
 
 def _log_orphan_records(
     indexed: dict[str, dict[tuple[str, int], dict[str, Any]]],
-    sweep_task_ids: list[str],
+    known_task_ids: set[str],
     runs_per_task: int,
 ) -> None:
-    """Warn about run records the sweep will never visit.
+    """Warn about run records with task_ids absent from tasks.jsonl.
 
-    Triggers when `architecture_*.json` contains a record whose
-    (task_id, run_index) is outside `sweep_task_ids × range(runs_per_task)` —
-    a deprecated task ID still in the run JSON, or a task that was added
-    to tasks.jsonl after the run was produced. Previously silent.
+    "Orphan" means the record's `task_id` isn't in tasks.jsonl at all
+    (deprecated task still in the run JSON, or task added since the
+    run was produced) — NOT records filtered out by --task-ids. The
+    earlier draft conflated the two and spammed the log when --task-ids
+    was used; the dry-run on POL-001+EDGE-001 made the noise obvious.
+
+    Also flags records whose run_index is outside [0, runs_per_task)
+    for tasks that ARE in tasks.jsonl — that's the same "silently
+    skipped" failure mode for a different reason.
     """
-    valid_keys = {(tid, ridx) for tid in sweep_task_ids for ridx in range(runs_per_task)}
     for arch, by_key in indexed.items():
-        orphans = sorted(k for k in by_key if k not in valid_keys)
-        for tid, ridx in orphans:
-            print(
-                f"[orphan] arch={arch} task={tid} run_index={ridx} — "
-                f"record exists in run JSON but is outside the sweep "
-                f"(not in --task-ids filter, or task_id absent from tasks.jsonl)",
-                file=sys.stderr,
-            )
+        for (tid, ridx) in sorted(by_key.keys()):
+            if tid not in known_task_ids:
+                print(
+                    f"[orphan] arch={arch} task={tid} run_index={ridx} — "
+                    f"task_id absent from tasks.jsonl",
+                    file=sys.stderr,
+                )
+            elif not (0 <= ridx < runs_per_task):
+                print(
+                    f"[orphan] arch={arch} task={tid} run_index={ridx} — "
+                    f"run_index outside [0, {runs_per_task})",
+                    file=sys.stderr,
+                )
 
 
 def _validate_task_schema(tasks: dict[str, dict[str, Any]], task_ids: list[str]) -> None:
@@ -728,8 +748,10 @@ def run_judge(
 
     # Surface records that exist in the run JSONs but have no corresponding
     # task in tasks.jsonl (deprecated task IDs, or tasks added since the
-    # run was produced) — previously silently skipped.
-    _log_orphan_records(indexed, sweep_task_ids, runs_per_task)
+    # run was produced) — previously silently skipped. Pass the full
+    # tasks.keys() set, not sweep_task_ids, so --task-ids filtering
+    # doesn't spam every excluded task as a false-positive orphan.
+    _log_orphan_records(indexed, set(tasks.keys()), runs_per_task)
 
     started_at = datetime.now(timezone.utc).isoformat()
 
