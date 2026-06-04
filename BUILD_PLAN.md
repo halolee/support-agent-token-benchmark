@@ -160,16 +160,9 @@ Three architectures measured, comparison report populated with real numbers, adv
 
 **Implication to document in `comparison.md`:** Phase 3 reports Cached RAG cost columns and explicitly carries forward Naive RAG's quality numbers (with a footnote: "Quality assumed equivalent to Naive RAG; bit-identical-response spot-check confirms determinism. Re-judging deferred to v2 quality series."). The cache matrix table notes Cached RAG quality as `= Naive RAG (by construction)` rather than as an independent measurement.
 
-**Pick-up point for next session (2026-06-04 EOD):** Step 11 + 11.5 shipped (commits `92047a4` + `f32ffe3`). Step 12 dispatch is pre-flighted — spot-check passed, gate fix in, cost confirmed. To launch the paid sweep:
+**Phase 3 ship status (2026-06-04):** Step 11 + 11.5 + 12 all shipped. Step 12 paid sweep completed at commit `f32ffe3` with **0 errors, 0 gate breaches, 51/51 dispatches caching-fired** (`cache_read_input_tokens > 0` on every run). Actual cost $2.20 (under the $2.60 estimate; mean $0.0432/run). Artifacts in `measurement/results/runs/2026-06-04-phase3-step12-cached-only/` (single-architecture sweep, append-only per Option Y).
 
-```
-.venv/bin/python -m measurement.runner \
-  --architectures cached_rag \
-  --runs 3 \
-  --results-dir runs/2026-06-04-phase3-step12-cached-only
-```
-
-(Uses default `measurement/tasks.jsonl` — all 17 frozen tasks.) Re-enable the API key first ([[reference-anthropic-console]]). Expected cost ~$2.60, runtime ~15 min. Article-worthy finding to expect: ~7% total-cost savings vs Naive RAG — the input cache is cheap but output tokens dominate, so caching shifts cost *shape* (input near-free, output unchanged) rather than collapsing total bill.
+**Article-worthy finding:** Caching delivered **21% total-bill savings** vs Naive RAG (32% on the input side), with output tokens unchanged and now dominating the post-cache bill (38% of cached cost vs 28% of uncached). This is meaningfully larger than the 7% the 3-task spot-check projected, because cache writes amortize across all 51 dispatches' shared system+tools prefix. It is also meaningfully smaller than the pre-registered 50–80% hypothesis, which over-anchored on cache-read pricing without modeling the un-cached output share. **Framing for the LinkedIn article:** caching shifts cost *shape* (input near-free, output unchanged), not magnitude. See `comparison.md` §"Caching effect on cost" (Headline section) and §"Cached RAG cost-shape shift" (post-decomposition table) for the publication-ready treatment.
 
 **Process gotchas (carried forward from v1):**
 - `[[feedback-runner-report-clobbers-comparison]]` — do NOT run `python -m measurement.runner --report` until §11 template renderer ships (issue #42). Hand-edit `comparison.md`.

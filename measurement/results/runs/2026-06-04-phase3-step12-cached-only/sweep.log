@@ -1,0 +1,55 @@
+Starting measurement: 1 arch × 17 task × 3 run = 51 (architecture, task, run) triples.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 60979.14it/s]
+[ok] arch=cached_rag task=POL-001 run=1/3 turns=3 input=5293 output=953 gate=1.0%
+[ok] arch=cached_rag task=POL-002 run=1/3 turns=3 input=4490 output=872 gate=1.1%
+[ok] arch=cached_rag task=POL-003 run=1/3 turns=3 input=4544 output=603 gate=1.3%
+[ok] arch=cached_rag task=TXN-001 run=1/3 turns=3 input=3671 output=786 gate=1.3%
+[ok] arch=cached_rag task=TXN-002 run=1/3 turns=3 input=4302 output=657 gate=2.6%
+[ok] arch=cached_rag task=TXN-003 run=1/3 turns=3 input=1459 output=488 gate=1.8%
+[ok] arch=cached_rag task=MIX-001 run=1/3 turns=5 input=12325 output=1719 gate=2.1%
+[ok] arch=cached_rag task=MIX-002 run=1/3 turns=3 input=5663 output=993 gate=2.2%
+[ok] arch=cached_rag task=MIX-003 run=1/3 turns=3 input=7214 output=994 gate=1.8%
+[ok] arch=cached_rag task=MIX-004 run=1/3 turns=3 input=6721 output=966 gate=1.9%
+[ok] arch=cached_rag task=MIX-005 run=1/3 turns=3 input=6750 output=1128 gate=1.7%
+[ok] arch=cached_rag task=MIX-006 run=1/3 turns=4 input=6265 output=1839 gate=3.5%
+[ok] arch=cached_rag task=MIX-007 run=1/3 turns=3 input=5682 output=846 gate=2.1%
+[ok] arch=cached_rag task=MIX-008 run=1/3 turns=3 input=7244 output=1065 gate=1.7%
+[ok] arch=cached_rag task=EDGE-001 run=1/3 turns=4 input=6186 output=1768 gate=2.6%
+[ok] arch=cached_rag task=EDGE-002 run=1/3 turns=3 input=4664 output=1031 gate=0.9%
+[ok] arch=cached_rag task=EDGE-003 run=1/3 turns=4 input=11115 output=1185 gate=2.0%
+[ok] arch=cached_rag task=POL-001 run=2/3 turns=4 input=8284 output=1129 gate=1.3%
+[ok] arch=cached_rag task=POL-002 run=2/3 turns=3 input=5249 output=853 gate=1.1%
+[ok] arch=cached_rag task=POL-003 run=2/3 turns=3 input=5286 output=617 gate=1.4%
+[ok] arch=cached_rag task=TXN-001 run=2/3 turns=3 input=3669 output=784 gate=1.3%
+[ok] arch=cached_rag task=TXN-002 run=2/3 turns=3 input=5112 output=693 gate=2.7%
+[ok] arch=cached_rag task=TXN-003 run=2/3 turns=3 input=2244 output=517 gate=1.8%
+[ok] arch=cached_rag task=MIX-001 run=2/3 turns=5 input=11344 output=1923 gate=2.4%
+[ok] arch=cached_rag task=MIX-002 run=2/3 turns=3 input=5992 output=959 gate=2.1%
+[ok] arch=cached_rag task=MIX-003 run=2/3 turns=4 input=8959 output=1716 gate=1.4%
+[ok] arch=cached_rag task=MIX-004 run=2/3 turns=3 input=7610 output=1106 gate=1.8%
+[ok] arch=cached_rag task=MIX-005 run=2/3 turns=4 input=8698 output=1725 gate=1.4%
+[ok] arch=cached_rag task=MIX-006 run=2/3 turns=4 input=7202 output=1844 gate=2.8%
+[ok] arch=cached_rag task=MIX-007 run=2/3 turns=3 input=6577 output=941 gate=2.2%
+[ok] arch=cached_rag task=MIX-008 run=2/3 turns=3 input=7911 output=1112 gate=1.8%
+[ok] arch=cached_rag task=EDGE-001 run=2/3 turns=4 input=6984 output=1793 gate=2.6%
+[ok] arch=cached_rag task=EDGE-002 run=2/3 turns=3 input=5270 output=934 gate=1.0%
+[ok] arch=cached_rag task=EDGE-003 run=2/3 turns=4 input=11612 output=1122 gate=2.1%
+[ok] arch=cached_rag task=POL-001 run=3/3 turns=4 input=10840 output=1159 gate=1.2%
+[ok] arch=cached_rag task=POL-002 run=3/3 turns=3 input=5327 output=931 gate=1.0%
+[ok] arch=cached_rag task=POL-003 run=3/3 turns=3 input=5276 output=607 gate=1.3%
+[ok] arch=cached_rag task=TXN-001 run=3/3 turns=3 input=3683 output=798 gate=1.3%
+[ok] arch=cached_rag task=TXN-002 run=3/3 turns=3 input=5050 output=631 gate=2.6%
+[ok] arch=cached_rag task=TXN-003 run=3/3 turns=3 input=2256 output=529 gate=1.8%
+[ok] arch=cached_rag task=MIX-001 run=3/3 turns=5 input=11661 output=1857 gate=2.4%
+[ok] arch=cached_rag task=MIX-002 run=3/3 turns=3 input=5933 output=1006 gate=2.1%
+[ok] arch=cached_rag task=MIX-003 run=3/3 turns=3 input=7959 output=950 gate=1.8%
+[ok] arch=cached_rag task=MIX-004 run=3/3 turns=3 input=7517 output=1002 gate=1.7%
+[ok] arch=cached_rag task=MIX-005 run=3/3 turns=4 input=7827 output=1752 gate=2.3%
+[ok] arch=cached_rag task=MIX-006 run=3/3 turns=4 input=7535 output=1808 gate=2.9%
+[ok] arch=cached_rag task=MIX-007 run=3/3 turns=3 input=6487 output=851 gate=2.2%
+[ok] arch=cached_rag task=MIX-008 run=3/3 turns=3 input=7003 output=959 gate=2.1%
+[ok] arch=cached_rag task=EDGE-001 run=3/3 turns=4 input=6936 output=1758 gate=2.6%
+[ok] arch=cached_rag task=EDGE-002 run=3/3 turns=3 input=8772 output=957 gate=1.7%
+[ok] arch=cached_rag task=EDGE-003 run=3/3 turns=3 input=7566 output=863 gate=2.0%
+Wrote runs/2026-06-04-phase3-step12-cached-only/architecture_cached_rag.json: 51 runs, 0 errors.
