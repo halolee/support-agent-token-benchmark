@@ -238,14 +238,26 @@ def _gate_ratio(record: dict[str, Any]) -> float:
     real API input and must be in the gate-side sum, even though they're
     excluded from the *reported* decomposition). Falls back to
     `decomposition_input_sum` for single-turn callers (the smoke path).
+
+    Caching-aware: `api_input_tokens` reports ONLY the standard-priced
+    input subset (Anthropic bills cache_creation and cache_read input
+    tokens on separate counters). The count_tokens-derived decomposition
+    sees the FULL prompt regardless of caching. So for an apples-to-apples
+    comparison the denominator must be (api_input + cache_create +
+    cache_read) — the total tokens actually processed by the model. The
+    fields default to 0 for non-caching architectures, so this is a no-op
+    for Naive RAG, Grep search, Hybrid RAG.
     """
     api_input = record["api_input_tokens"]
-    if api_input == 0:
+    cache_create = record.get("cache_creation_input_tokens", 0) or 0
+    cache_read = record.get("cache_read_input_tokens", 0) or 0
+    total_processed = api_input + cache_create + cache_read
+    if total_processed == 0:
         return 0.0
     inclusive = record.get(
         "decomposition_input_sum_with_audit", record["decomposition_input_sum"]
     )
-    return abs(inclusive - api_input) / api_input
+    return abs(inclusive - total_processed) / total_processed
 
 
 def _dispatch_one(
