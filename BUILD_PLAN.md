@@ -140,6 +140,48 @@ Three architectures measured, comparison report populated with real numbers, adv
 
 **Estimated effort:** 0.5 day
 
+### Handover from v1 ship (2026-06-04) — read before starting
+
+**Starting state:** v1 shipped at tag `measurement-v1`. Three architectures measured (Naive RAG, Grep search, Hybrid RAG). Cost ordering settled HIGH-confidence. Quality numbers LOW-confidence pending Finding C3 fix (v2 series, queued separately in `ROADMAP.md`). Phase 3 is sequenced **ahead of** the v2 quality re-measurement series because the v1 headline goal is *token cost*, and caching is the obvious cost optimization on the cheapest measured architecture — quantifying it answers the headline question directly. The v2 quality re-measurement settles a calibration question that does not affect the cost story; it stays scheduled but waits.
+
+**Read first, in order:**
+1. This Phase 3 spec below (Step 11–12).
+2. `measurement/results/comparison.md` §"Scope of measurement: the cache matrix" — the 4-of-6 cells v1 fills, and which v2 cells caching opens up.
+3. `architectures/naive_rag/README.md` — what Cached RAG extends.
+4. `METHODOLOGY.md` §"Model and configuration" — caching is enabled for Cached RAG only; disabled for the v1 measured three.
+
+**Key design choice for Step 11 (decide before implementing):**
+- **Option A — Copy `architectures/naive_rag/` to `architectures/cached_rag/`.** Methodology framing favors this: Cached RAG is a separately-named architecture in METHODOLOGY and `comparison.md`, not a config flag. Code duplication is the cost; clean divergence on caching-specific tuning is the benefit.
+- **Option B — Add a `--cached` flag to `architectures/naive_rag/agent.py`.** One code path; branching logic at run time. Lighter footprint.
+- **Recommendation: Option A.** Aligns with the methodology framing and keeps the v2 quality re-judging cleaner (the judge sees `architecture: cached_rag` as a distinct identity).
+
+**Sweep protocol — the consequential decision for Step 12:**
+
+METHODOLOGY §"Run protocol" requires *all measured architectures execute the full task set in a single alternating run* to control time-of-day variance. Phase 3 has two paths:
+- **Option X (recommended) — full re-sweep of all four architectures (Naive RAG, Cached RAG, Grep search, Hybrid RAG) in a new alternating run.** Protocol-clean; produces a fresh dated dir with 204 dispatches (51 per arch × 4 archs). Drops `runs/2026-06-04-phase2-step8b/` as the v1 frozen reference (it stays as the v1 historical record; the new sweep is the v1+Phase 3 canonical). Estimated cost: ~$9 (agent re-sweep ~$4 + judge ~$5).
+- **Option Y — Cached RAG alone (51 dispatches) appended to the v1 sweep's analysis.** Breaks the alternating protocol; defensible only if the time-of-day variance is documented as a known scope limit on the Cached RAG measurement. Cheaper (~$4 total).
+
+**Recommendation: Option X.** Methodology-clean, and at the same scale of paid spend that v1 itself cost (~$6.50 judge + agent sweep). Option Y saves ~$5 at the cost of a methodology asterisk on the headline finding.
+
+**Process gotchas (carried forward from v1):**
+- `[[feedback-runner-report-clobbers-comparison]]` — do NOT run `python -m measurement.runner --report` until §11 template renderer ships (issue #42). Hand-edit `comparison.md`.
+- Frozen artifact rule: `architecture_*.json` and `judgments_*.json` under existing `runs/*/` dirs are read-only. Phase 3 output lands in a new dated dir.
+- `[[reference-anthropic-console]]` — API key disabled by default; re-enable before paid runs, disable after.
+- Finding C3 (judge architecture-label leak) is NOT fixed yet. Cached RAG's quality numbers will inherit the same calibration limit as v1; this is acceptable because Phase 3's headline is cost, not quality. The v2 series remains the canonical quality settlement work.
+
+**Hypothesis worth pre-registering** (so the article narrative has a frame either way):
+
+> Anthropic's prompt caching collapses cached-prefix input-token cost by ~90% on the cached portion (cache reads priced at ~$0.30/M vs $3/M list for Sonnet 4.6). Naive RAG's measured ① system prompt (1,693 mean) + ④ tool overhead (4,746 mean) — ~6,400 tokens — is the natural cache target. If retrieved chunks are stable for a non-trivial fraction of queries, ② retrieved_context (5,041 mean) joins the cacheable prefix. Expected outcome: Cached RAG median input cost drops 50–80% vs Naive RAG, depending on cache hit rate. If the drop is <30%, that's a methodology finding about prefix variability under realistic agent loops; publishable either way.
+
+**Exit criteria for Phase 3:**
+- Cached RAG measured with the chosen sweep protocol (Option X recommended).
+- `comparison.md` headline + per-class + decomposition tables populated for the Cached RAG column (currently marked "Phase 3 — not measured").
+- §"Confidence and known biases" Check 1 row for Cached RAG: confirm caching is configured to maximize stable-prefix reuse (not just enabled with defaults).
+- New tag `cached-rag-v1` on the Phase 3 ship commit, parallel to `measurement-v1`. Tag annotation includes the sweep dir provenance.
+- `README.md` headline table updated; `HANDOVER.md` §6 + §9 amended; `ROADMAP.md` decision log entry added.
+
+**v2 quality re-measurement series stays queued** in `ROADMAP.md` §"Quality re-measurement series." After Phase 3 ships, v2 is the natural next move — it would re-judge BOTH the v1 sweep AND the Phase 3 Cached RAG sweep with the blinded judge prompt, settling the architecture-quality story once.
+
 ### Step 11: Implement Cached RAG
 
 - [ ] Copy `architectures/naive_rag/` to `architectures/naive_rag_cached/` (or add a `--cached` flag to the existing Naive RAG agent)
