@@ -99,6 +99,50 @@ class TestCachingMarkers:
             "shared dict."
         )
 
+    def test_shared_booking_schemas_not_mutated(self):
+        """Cached RAG must not mutate the shared BOOKING_TOOL_SCHEMAS list
+        or its dict entries. Cached RAG currently spreads them into its own
+        TOOL_SCHEMAS via per-dict shallow copies; if a future change reverts
+        to spreading them by reference and then mutates one (e.g., adding
+        cache_control to search_flights), every other architecture's
+        TOOL_SCHEMAS list silently inherits the marker. Guard regardless.
+        """
+        from architectures.cached_rag import tools as _cached_tools  # noqa: F401
+        from architectures._shared.booking_tools import BOOKING_TOOL_SCHEMAS
+
+        for schema in BOOKING_TOOL_SCHEMAS:
+            assert "cache_control" not in schema, (
+                f"Shared booking schema {schema.get('name')!r} was mutated "
+                f"to include cache_control. Cached RAG's TOOL_SCHEMAS must "
+                f"spread per-dict shallow copies of BOOKING_TOOL_SCHEMAS, "
+                f"not the originals."
+            )
+
+
+class TestPromptParityWithNaive:
+    """Enforces the by-construction equivalence claim: Cached RAG's prompt
+    text must remain byte-identical to Naive RAG's. Option Y's quality-
+    inheritance shortcut (BUILD_PLAN §Phase 3) breaks if the prompts ever
+    drift apart silently. See `measurement/results/comparison.md` §"Cached
+    RAG measurement asterisk" for why this matters.
+    """
+
+    def test_cached_rag_system_prompt_text_matches_naive(self):
+        from architectures.cached_rag.prompts import SYSTEM_PROMPT as CACHED_SYSTEM_PROMPT
+        from architectures.naive_rag.prompts import SYSTEM_PROMPT as NAIVE_SYSTEM_PROMPT
+
+        # Cached RAG wraps the text in a typed-block list; Naive RAG ships
+        # the raw string. Compare the underlying text bytes.
+        assert isinstance(CACHED_SYSTEM_PROMPT, list)
+        cached_text = CACHED_SYSTEM_PROMPT[0]["text"]
+        assert cached_text == NAIVE_SYSTEM_PROMPT, (
+            "Cached RAG SYSTEM_PROMPT text has drifted from Naive RAG's. "
+            "Option Y (quality inheritance) requires byte-identical prompts; "
+            "either revert the drift, or re-judge Cached RAG quality "
+            "independently and drop the `= Naive RAG (by construction)` "
+            "footnote in comparison.md."
+        )
+
 
 class TestAgentRegistration:
     def test_registers_into_runner_registry(self):

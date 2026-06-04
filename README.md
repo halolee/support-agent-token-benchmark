@@ -113,7 +113,7 @@ python -m measurement.judge --runs-dir measurement/results/runs/<your-dated-dir>
 # (issue #42, fix tracked as §11 template renderer).
 ```
 
-Expected runtime: ~30 minutes for the full task set + judge across the three measured architectures.
+Expected runtime: ~45 minutes for the full task set + judge across the four measured architectures (or ~30 minutes for the three uncached architectures only).
 
 ## Repository structure
 
@@ -131,7 +131,8 @@ Expected runtime: ~30 minutes for the full task set + judge across the three mea
 │   └── travel.sqlite                  # Booking data (sourced from LangGraph tutorial)
 ├── architectures/
 │   ├── naive_rag/                   # Vector store + top-K retrieval
-│   ├── grep_search/                        # Keyword search as a tool
+│   ├── cached_rag/                  # Naive RAG + Anthropic prompt caching
+│   ├── grep_search/                 # Keyword search as a tool
 │   └── hybrid_rag/                  # Vector + BM25 + reranking
 ├── architectures_deferred/            # Placeholders for Bounded tools and Stuffed corpus (v2)
 ├── measurement/

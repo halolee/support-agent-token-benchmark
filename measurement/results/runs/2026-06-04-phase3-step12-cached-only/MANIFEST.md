@@ -15,7 +15,7 @@ Phase 3, BUILD_PLAN §12. Cached RAG sweep via Option Y (cost-only, no re-judge;
 - **Dispatches:** 17 tasks × 1 arch × 3 runs = **51**
 - **Errors:** 0
 - **Retries:** 0
-- **Gate breaches (caching-aware 5% gate):** 0 (mean gate ratio 1.9%, max 2.9% — well under tolerance)
+- **Gate breaches (caching-aware 5% gate):** 0 (mean gate ratio 1.9%, max 3.5% on MIX-006 run_index=0 — well under tolerance, ~1.5pp of headroom)
 - **Caching fired:** 51/51 dispatches (`cache_read_input_tokens > 0` on every run)
 - **Max turns observed:** 5 (MIX-001) — under the 12 ceiling
 

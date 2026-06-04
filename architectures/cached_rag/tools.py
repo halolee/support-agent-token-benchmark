@@ -68,7 +68,7 @@ def _get_collection():
         if not VECTOR_STORE_DIR.exists():
             raise FileNotFoundError(
                 f"Vector store not found at {VECTOR_STORE_DIR}. Run "
-                f"`python -m architectures.naive_rag.setup_vector_store` first."
+                f"`python -m architectures.cached_rag.setup_vector_store` first."
             )
         client = chromadb.PersistentClient(path=str(VECTOR_STORE_DIR))
         _collection = client.get_collection(name=COLLECTION_NAME)
@@ -198,9 +198,16 @@ _CACHED_AUDIT_TOOL_SCHEMA = {
     "cache_control": {"type": "ephemeral"},
 }
 
+# Defensive shallow-copy each booking schema as well so future
+# per-architecture mutations (e.g., adding cache_control to one of them)
+# stay contained to Cached RAG and don't leak into the shared list seen
+# by Naive RAG / Grep search / Hybrid RAG. The values inside each schema
+# remain shared by reference — they're treated as immutable schema
+# constants and any mutation of nested values would be a bug regardless.
+# Test coverage for this invariant lives in `test_cached_rag.py::test_shared_booking_schemas_not_mutated`.
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     VECTOR_SEARCH_SCHEMA,
-    *BOOKING_TOOL_SCHEMAS,
+    *[dict(schema) for schema in BOOKING_TOOL_SCHEMAS],
     _CACHED_AUDIT_TOOL_SCHEMA,
 ]
 

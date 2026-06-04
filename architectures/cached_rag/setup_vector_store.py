@@ -1,12 +1,18 @@
-"""One-time script: chunk `corpus/swiss_faq.md` and build the vector store.
+"""One-time script: chunk `corpus/swiss_faq.md` and build the Cached RAG vector store.
 
-Run once before the Naive RAG agent can query:
+Run once before the Cached RAG agent can query:
 
-    python -m architectures.naive_rag.setup_vector_store
+    python -m architectures.cached_rag.setup_vector_store
 
 Idempotent — re-running rebuilds from scratch (the persistent ChromaDB
-directory under `architectures/naive_rag/vector_store/` is dropped and
+directory under `architectures/cached_rag/vector_store/` is dropped and
 recreated). The vector store directory is gitignored; each clone rebuilds.
+
+Cached RAG uses an independent vector store from Naive RAG (rather than
+sharing) to keep Option A's clean architectural separation; the chunking
++ embedding logic is intentionally identical, so the resulting indexes
+should be byte-equivalent given identical sentence-transformers /
+BGE-M3 versions. See `cached_rag/README.md` for the parity rationale.
 
 Embedding model: `BAAI/bge-m3` self-hosted, normalised to unit length so
 cosine similarity is equivalent to inner product. Downloading the model
@@ -20,8 +26,8 @@ import sys
 from pathlib import Path
 
 
-# Allow `python architectures/naive_rag/setup_vector_store.py` as well as
-# `python -m architectures.naive_rag.setup_vector_store`.
+# Allow `python architectures/cached_rag/setup_vector_store.py` as well as
+# `python -m architectures.cached_rag.setup_vector_store`.
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 

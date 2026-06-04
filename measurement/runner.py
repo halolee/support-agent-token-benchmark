@@ -297,11 +297,15 @@ def _dispatch_one(
         ratio = _gate_ratio(record)
         record["gate_ratio"] = ratio
         record["gate_breach"] = ratio >= _GATE_TOLERANCE
+        cache_create = record.get("cache_creation_input_tokens", 0) or 0
+        cache_read = record.get("cache_read_input_tokens", 0) or 0
+        total_processed = record["api_input_tokens"] + cache_create + cache_read
         if record["gate_breach"]:
             print(
                 f"[gate-breach] arch={arch_name} task={task['task_id']} "
                 f"run={run_index + 1}/{runs_total} ratio={ratio:.1%} "
-                f"(API={record['api_input_tokens']}, "
+                f"(api_input={record['api_input_tokens']}, cache_create={cache_create}, "
+                f"cache_read={cache_read}, total_processed={total_processed}, "
                 f"inclusive_sum={record.get('decomposition_input_sum_with_audit', record['decomposition_input_sum'])}) "
                 f"— flagged, not silenced per METHODOLOGY",
                 file=sys.stderr,
@@ -310,7 +314,7 @@ def _dispatch_one(
             f"[ok] arch={arch_name} task={task['task_id']} "
             f"run={run_index + 1}/{runs_total} "
             f"turns={record.get('turns', 1)} "
-            f"input={record['api_input_tokens']} "
+            f"input={total_processed} "
             f"output={record['api_output_tokens']} "
             f"gate={ratio:.1%}"
         )
@@ -524,7 +528,17 @@ def generate_report(
         runs = data.get("runs", [])
         if not runs:
             continue
-        input_tokens = [r["api_input_tokens"] for r in runs]
+        # Caching-aware aggregation: for Cached RAG (and any future caching
+        # variant) the "input the model processed" includes cache_creation
+        # and cache_read tokens, not just standard-priced api_input. The
+        # `.get(..., 0) or 0` defaults make this a no-op for uncached
+        # architectures whose records carry cache_create=cache_read=0.
+        input_tokens = [
+            r["api_input_tokens"]
+            + (r.get("cache_creation_input_tokens", 0) or 0)
+            + (r.get("cache_read_input_tokens", 0) or 0)
+            for r in runs
+        ]
         output_tokens = [r["api_output_tokens"] for r in runs]
         rows.append(
             {
