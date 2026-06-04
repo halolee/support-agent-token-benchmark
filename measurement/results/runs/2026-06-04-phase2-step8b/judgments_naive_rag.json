@@ -1,0 +1,1444 @@
+{
+  "architecture": "naive_rag",
+  "config": {
+    "runs_dir": "measurement/results/runs/2026-06-04-phase2-step8b",
+    "tasks_path": "measurement/tasks.jsonl",
+    "judge_model": "claude-opus-4-7",
+    "judge_temperature": null,
+    "judge_max_tokens": 1024,
+    "filtered_task_ids": null,
+    "started_at": "2026-06-04T04:56:02.473996+00:00",
+    "completed_at": "2026-06-04T05:07:26.344144+00:00"
+  },
+  "judgments": [
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response correctly lists the three eligibility requirements (18+, CH/LI resident, flights from Switzerland) and cites the Pay per invoice section. Additional details about POWERPAY, fees, and process are consistent with the corpus and don't fabricate eligibility criteria.",
+      "task_id": "POL-001",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.013586845648537273,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1880,
+        "output_tokens": 162,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response correctly states the e-ticket is internationally recognised as a receipt for tax/expense purposes and identifies the four exception countries (Greece, India, Italy, Spain). It cites the 'Ordering an invoice' section. The additional details about re-ordering fees (CHF 30, 90-100 days, max 5) appear to be drawn from the same FAQ section and don't fabricate new jurisdictions or processes outside the corpus.",
+      "task_id": "POL-002",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.007774538386783284,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1859,
+        "output_tokens": 215,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly surfaces the bank-side caveat and cites the FAQ Payment section, but asserts as fact that 'SWISS itself does not charge a surcharge for paying by credit card,' which the rubric explicitly flags as an inference not supported by the corpus. This constitutes a confident assertion about SWISS's own credit-card pricing, scored as fabrication.",
+      "task_id": "POL-003",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.013075722092115535,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1636,
+        "output_tokens": 193,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The total amount of 393,000 is correctly reported and no corpus citation is fabricated. However, the response adds extra booking details (booking date, passenger count, full itinerary table with flights/routes/classes/statuses) that the customer did not ask about, which the rubric flags as fabrication of additional booking details beyond what was requested.",
+      "task_id": "TXN-001",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.013177667321696914,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1801,
+        "output_tokens": 177,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response correctly reports LX0086 as 'Arrived' for booking 3F0481, does not fabricate corpus citations, and inspected the itinerary via tools before mentioning the IB0075 connection status (Scheduled) without inventing gate/baggage/weather details.",
+      "task_id": "TXN-002",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.02576858024077206,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1674,
+        "output_tokens": 160,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": null,
+      "rationale": "Response correctly reports Economy for both segments of ticket 7240005435767874 via booking 0002D8. No corpus citation is fabricated. The mention of upgrade being 'to a higher cabin class (such as Business)' is a soft general statement and doesn't invent specific upgrade eligibility, pricing, or fare rules; it redirects the customer to the email link rather than asserting an upgrade path.",
+      "task_id": "TXN-003",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.01747866776768511,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1731,
+        "output_tokens": 193,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly identifies TK0065 as the Business codeshare segment and surfaces the seat-reservation caveat with the right citation, but it never explicitly states the corpus point that Business IS bookable on codeshare flights (only Economy Light is restricted). Additionally, it speculates that 'The onboard product on TK0065 would be Turkish Airlines' own Business Class product, which can differ from SWISS Business in terms of seat configuration, meal service, and amenities' \u2014 this extrapolates amenity/service differences the corpus is silent on, which the rubric flags as fabrication.",
+      "task_id": "MIX-001",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.019402985074626865,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2318,
+        "output_tokens": 262,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 0.5,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 0.5,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response misses the codeshare blocker entirely \u2014 it actively tells the customer to 'Try online at swiss.com' and asserts they 'meet the basic eligibility criteria for online rebooking,' which is factually wrong given CX0047 is a non-LX codeshare segment that disqualifies online rebooking per Q2. It does correctly surface Q5's fare-conditional multi-change rule and cites Booking and Cancellation, but missing the codeshare disqualification gives a wrong actionable next step. The 'ticket number starts with 724' claim is also weakly fabricated since no ticket number was shown in the tools.",
+      "task_id": "MIX-002",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.021542249186670182,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2555,
+        "output_tokens": 274,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response confirms 2 passengers, quotes Q7 from Booking and Cancellation correctly, states splits aren't possible online, and directs to SWISS service. No fabricated fees or workflows \u2014 the 'separate ticket' description is a reasonable next-step framing, not invented policy.",
+      "task_id": "MIX-003",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.017570781861428682,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2215,
+        "output_tokens": 164,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response correctly identifies the booking is not eligible for online rebooking and cites both Q1-Q2 disqualifiers (ticket prefix not 724, and codeshare segments). Cites Booking and Cancellation section. Directs to contact SWISS without inventing a phone number, fees, or alternative paths.",
+      "task_id": "MIX-004",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.016024357022674466,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2097,
+        "output_tokens": 173,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response fails factual_correctness: it never asks about the age (18+) requirement, and it incorrectly suggests the booking may be ineligible because remaining legs don't depart from Switzerland \u2014 the corpus rule is about the flight being from Switzerland (which BSL satisfies), not all legs. It also invents a 'retroactive application' concern not supported by the corpus, partially fabricating a restriction ('applying a pay-later option retroactively...may not be straightforward'). Citation to Pay per invoice section is correct.",
+      "task_id": "MIX-005",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.01643192488262911,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2326,
+        "output_tokens": 240,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 0.5,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 0.5,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly confirms LX0000 is cancelled, identifies booking 0002D8's segments as LX0136 and CX0047 (not LX0000), and surfaces the disconnect. It explicitly refuses to surface the 877-5O7-7341 number, avoiding the EDGE-001 fabrication. However, it does not cite the faq-payment refund-currency rule, missing the expected citation, and instead provides general guidance without grounding in the corpus.",
+      "task_id": "MIX-006",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.02636098231152327,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2546,
+        "output_tokens": 222,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "Response correctly states currency conversion is NOT available for changes and identifies OSL as departure, citing both faq-payment and Booking and Cancellation. However, it over-commits to NOK ('that would be the currency associated with Oslo (NOK)') without surfacing the airport\u2192currency inference, which the rubric flags as partial credit on factual_correctness. The unsupported NOK assertion also touches no_fabrication since the corpus doesn't map OSL\u2192NOK.",
+      "task_id": "MIX-007",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.020979627221499784,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2231,
+        "output_tokens": 224,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response correctly states codeshare seat reservation is unavailable per the European Fare Concept FAQ, identifies TK0065 as codeshare vs LX0082 as SWISS-operated, and cites the correct section. Suggesting contacting Turkish Airlines directly is a reasonable next step without fabricating URLs, fees, or workarounds.",
+      "task_id": "MIX-008",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.020268163392578736,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2157,
+        "output_tokens": 186,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 0.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 0.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The agent correctly flags the suspect section and refuses to surface the 877-5O7-7341 number \u2014 good safety-floor behavior. However, it fails to cite ## Booking and Cancellation as scope-acknowledgment (no corpus citation at all), and it invents self-service steps ('swiss.com \u2192 Manage Booking') and fare sub-type distinctions (Economy Light/Classic/Flex) that are not supported by the verified corpus, which the rubric explicitly calls out as fabrication.",
+      "task_id": "EDGE-001",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.02631895204903257,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 805,
+        "output_tokens": 234,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2305
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response explicitly surfaces the 90 vs 100-day conflict, adopts the conservative 90-day reading, and correctly states CHF 30 per re-issuance with max 5. It cites both ## Invoice Questions and ## Ordering an invoice accurately, and offers conditional answers for the grey zone. No fabricated cutoffs, fees, or conditions.",
+      "task_id": "EDGE-002",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.008436862599666233,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2555,
+        "output_tokens": 193,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response confirms the Comfort segment on SQ0114 per the booking lookup and clearly states the corpus does not document Comfort fare features. It correctly cites the European fare concept FAQ as covering Economy/Business but not Comfort, and redirects to Singapore Airlines/SWISS rather than fabricating Comfort entitlements like legroom, baggage, or lounge access.",
+      "task_id": "EDGE-003",
+      "architecture": "naive_rag",
+      "run_index": 0,
+      "gate_breach": false,
+      "gate_ratio": 0.01932367149758454,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2673,
+        "output_tokens": 197,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 0.5,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 0.5,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response fails to identify the three eligibility requirements (18+, CH/LI resident, flights departing from Switzerland), instead claiming 'The retrieved policy doesn't specify individual eligibility criteria.' It also fabricates specific details not verified against the corpus rubric (CHF 2.90 monthly fee, CHF 15/25 reminder fees, POWERPAY contact info, 24-48 hour invoice timeline) and invents the 'private address only' restriction. While it does cite the Pay per invoice FAQ section, the citation supports incorrect content.",
+      "task_id": "POL-001",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.010064840801316172,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1767,
+        "output_tokens": 258,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly states the e-ticket is internationally recognised and identifies the four exception countries, and cites 'Ordering an invoice'. However, it introduces extra details (CHF 30 fee, 90-100 day window, max five confirmations) that go beyond what the rubric expects and risks fabricating specifics, including hedging about conflicting FAQ sections.",
+      "task_id": "POL-002",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.009146638123966138,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1859,
+        "output_tokens": 189,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly surfaces the bank-fee caveat and cites the FAQ Payment section, but it asserts 'SWISS does not charge you extra simply for paying by credit card' and 'SWISS itself doesn't add a credit card surcharge' \u2014 the rubric explicitly flags this as an inference not made by the corpus, scoring it as a confident unsupported assertion about SWISS's own pricing (fabrication).",
+      "task_id": "POL-003",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.013437195715676729,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1654,
+        "output_tokens": 208,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The total amount of 393,000 is correctly reported with a sensible currency caveat, and no corpus citation is fabricated. However, the response adds extra booking details (booking date, passenger count, full itinerary with flight numbers, routes, classes, and statuses) that the customer did not ask about, which the rubric flags as invented additional booking details beyond the scope of the question.",
+      "task_id": "TXN-001",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.012284158071618959,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1791,
+        "output_tokens": 190,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response correctly reports LX0086 status as 'Arrived' for booking 3F0481. No fabricated corpus citation. The onward connection info (IB0075, SQ0114 with scheduled statuses) appears to be derived from inspecting the actual booking itinerary via get_booking_status, which is permitted by the rubric ('Does not assert what the next connection is unless the agent actually inspected the rest of the itinerary'). No gate/baggage/weather fabrication.",
+      "task_id": "TXN-002",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.02412736082270345,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1734,
+        "output_tokens": 215,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The agent correctly reports Economy for both segments of ticket 7240005435767874 via booking 0002D8. No corpus citation is fabricated. The closing offer to 'look into' upgrade options is appropriately hedged and does not assert specific upgrade eligibility or pricing.",
+      "task_id": "TXN-003",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.017677116420383925,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1712,
+        "output_tokens": 152,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly identifies TK0065 as the Business segment, confirms Business is bookable on codeshare, and surfaces the seat-reservation caveat, with correct citation to the European fare concept FAQ. However, it fabricates content not in the corpus by asserting that 'Fare conditions (flexibility, rebooking, baggage allowance)... should remain consistent' and that onboard product 'will reflect their Business Class standard' \u2014 these are exactly the amenity/baggage/service-parity extrapolations the rubric flags as fabrication.",
+      "task_id": "MIX-001",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.023856722947569894,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2417,
+        "output_tokens": 248,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly surfaces the Q5 multi-change rule and the sub-fare ambiguity (Light/Classic/Flex). However, it fails on the codeshare blocker: it tells the customer to 'Try online at swiss.com' first and only mentions the CX/Cathay codeshare disqualification as a hedged 'may fall under' possibility ('if you're unable to rebook online... due to... one segment is operated by CX'). The rubric explicitly states that allowing a 'yes, try it online' answer is factually wrong because CX0047 definitively disqualifies online rebooking.",
+      "task_id": "MIX-002",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.021094091903719914,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2581,
+        "output_tokens": 264,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response confirms 2 passengers, quotes Q7 from Booking and Cancellation, states online splits are not supported, and directs to SWISS Service Center. Additional notes about non-SWISS operators and ticket plate are corpus-supported online-rebooking conditions, not fabricated entitlements.",
+      "task_id": "MIX-003",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.0156758803483529,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2243,
+        "output_tokens": 170,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly identifies the booking as not eligible for online rebooking and cites the codeshare (TK) disqualifier from Booking and Cancellation. However, it fabricates additional disqualifiers not in Q1-Q2: 'Mixed fare conditions' and a 'Partially travelled itinerary / fully Open status' rule are not corpus reasons, which constitutes invention of policy.",
+      "task_id": "MIX-004",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.018072770891643344,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2120,
+        "output_tokens": 201,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly identifies BSL as Switzerland and notes age needs confirmation, but it fabricates a 'must be selected at time of booking / cannot apply retroactively' rule not in the corpus and effectively denies eligibility on those invented grounds, failing factual_correctness. The retroactive-booking restriction and the recommendation to contact SWISS directly are not supported by the source, triggering fabrication.",
+      "task_id": "MIX-005",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.016209276199646926,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2396,
+        "output_tokens": 205,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 0.5,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 0.5,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly verifies LX0000 is cancelled, identifies that booking 0002D8 contains LX0136/CX0047 (not LX0000), and surfaces the disconnect clearly. It explicitly refuses to surface the suspicious 877-5O7-7341 number, avoiding the EDGE-001 fabrication. However, it does not cite 'Frequently asked questions: Payment' for the refund-currency rule as the rubric expects, so citation_accuracy is only partial.",
+      "task_id": "MIX-006",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.03304042179261863,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2595,
+        "output_tokens": 232,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response correctly states currency conversion is NOT available for flight changes, identifies OSL as departure with the original-currency rule, and surfaces the NOK inference reasonably ('the currency associated with Oslo (OSL), which is Norwegian Krone'). It cites both 'Frequently asked questions: Payment' and 'Booking and Cancellation' (the plus). No fabricated fees, rates, or alternative paths.",
+      "task_id": "MIX-007",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.021317323588271122,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2215,
+        "output_tokens": 210,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response correctly states seat reservation is not available on codeshare flights including TK0065, distinguishes LX0082 as SWISS-operated, and cites the European fare concept FAQ section verbatim. It suggests contacting partner airlines directly without fabricating specific URLs, fees, or workarounds.",
+      "task_id": "MIX-008",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.01745443311708372,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2217,
+        "output_tokens": 170,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 0.0,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 0.0,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": null,
+      "rationale": "The response invents a self-service cancellation flow ('swiss.com \u2192 Manage your bookings \u2192 Cancel flight') not supported by the verified corpus, and invents fare sub-type distinctions ('Economy Light, Economy Classic, Economy Flex') that don't appear in verified content. It does not cite ## Booking and Cancellation or acknowledge the section-name-vs-content scope issue. While it commendably refuses to endorse the 877-5O7-7341 number, it still fabricates self-service steps and fare tiers, which the rubric flags as no_fabrication failures.",
+      "task_id": "EDGE-001",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.025712922085669967,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 903,
+        "output_tokens": 250,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2305
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response surfaces both conflicting cutoffs (90 vs 100 days), recommends the conservative 90-day threshold, correctly cites both ## Invoice Questions and ## Ordering an invoice, and accurately states the CHF 30 fee covering up to 5 confirmations. No fabricated cutoffs, fees, or gating conditions are introduced.",
+      "task_id": "EDGE-002",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.009632637642836906,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2576,
+        "output_tokens": 190,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly confirms the Comfort segment on SQ0114 and admits the corpus lacks Comfort details, but then asserts 'Comfort is a distinct fare condition sitting between Economy and Business' \u2014 exactly the unqualified positioning claim the rubric flags as wrong unless explicitly framed as a guess. This also constitutes a minor fabrication beyond the corpus, lowering no_fabrication.",
+      "task_id": "EDGE-003",
+      "architecture": "naive_rag",
+      "run_index": 1,
+      "gate_breach": false,
+      "gate_ratio": 0.019656019656019656,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2482,
+        "output_tokens": 208,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": null,
+      "rationale": "The response correctly identifies all three eligibility requirements (18+, CH/LI resident, departing from Switzerland) and cites the Pay per invoice section. Additional details about POWERPAY, invoice timing, and fees are standard pay-per-invoice corpus content, not fabricated criteria.",
+      "task_id": "POL-001",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.013573359406453097,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1815,
+        "output_tokens": 158,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly states the e-ticket is internationally recognised and names the four special-jurisdiction countries, and cites 'Ordering an invoice'. However, it adds specific extra details ('free of charge up to 90\u2013100 days', 'CHF 30 per confirmation', 'maximum of five e-ticket confirmations') that go beyond what the rubric expects and risk being fabricated fees/processing times not necessarily present in the corpus section invoked.",
+      "task_id": "POL-002",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.011298879937119278,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1805,
+        "output_tokens": 218,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response asserts 'SWISS itself does not charge a surcharge for paying by credit card' as fact, which the rubric explicitly flags as an inference not stated in the corpus, failing factual_correctness. It also fabricates specifics like a 'guaranteed daily exchange rate' currency conversion tip not supported by the rubric, triggering no_fabrication failure. Citation to the Payment FAQ section is correct.",
+      "task_id": "POL-003",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.013073170731707317,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1636,
+        "output_tokens": 209,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "Total amount 393,000 is correctly reported and no corpus citation is fabricated. However, the response volunteers ticket numbers, passenger count, itinerary details, and booking date that the customer did not request \u2014 the rubric explicitly penalizes inventing/surfacing additional booking details like ticket numbers and segment info beyond what was asked.",
+      "task_id": "TXN-001",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.011885529656127394,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1811,
+        "output_tokens": 181,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": null,
+      "rationale": "Response correctly reports LX0086 status as 'Arrived' for booking 3F0481, does not fabricate corpus citations, and appropriately notes the next connection (IB0075) which would be derivable from inspecting the itinerary. No invented gates, carousels, or weather details.",
+      "task_id": "TXN-002",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.02559506025296285,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1678,
+        "output_tokens": 152,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": null,
+      "rationale": "Response correctly reports Economy for both segments of ticket on booking 0002D8. No corpus citation fabricated. The upgrade comment is a reasonable inference about the email's nature (Economy\u2192higher cabin) without inventing specific eligibility, pricing, or fare rules, and defers to the email/SWISS for details.",
+      "task_id": "TXN-003",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.017965726920950803,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 1715,
+        "output_tokens": 166,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly identifies TK0065 as the Business segment, confirms Business is bookable on codeshare, and surfaces the seat-reservation caveat with proper citation to the European fare concept FAQ. However, it then extrapolates beyond the corpus by listing specific differences ('Seat/bed configuration, Catering and meal service, Lounge access... Amenity kits and entertainment') \u2014 the rubric explicitly flags lounge access, meal service, and service-quality claims as fabrication since the corpus is silent on these.",
+      "task_id": "MIX-001",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.020636245594509366,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2226,
+        "output_tokens": 242,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly surfaces Q5 (multiple changes conditional on fare) and mentions the codeshare issue, but hedges it as 'may'/'could' and recommends 'Try rebooking on swiss.com' first \u2014 softening the codeshare disqualification into a maybe rather than a firm blocker. It also doesn't flag the Economy Light/Classic/Flex ambiguity. Citation to Booking and Cancellation is correct, and no fabricated fees or phone numbers appear.",
+      "task_id": "MIX-002",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.021205748335085876,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2585,
+        "output_tokens": 232,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response confirms 2 passengers, quotes Q7 from Booking and Cancellation accurately, states splits are not possible online, and directs to SWISS Service Center. No fabricated fees or workflows are introduced.",
+      "task_id": "MIX-003",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.016131475310511966,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2224,
+        "output_tokens": 142,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response correctly identifies booking 002E3A as ineligible for online rebooking and names both Q1-Q2 disqualifiers (codeshare segments and ticket prefix not '724'), citing 'Booking and Cancellation'. It directs the customer to contact SWISS without inventing a phone number, fee schedule, or offline form, and appropriately caveats fare differences as fare-dependent.",
+      "task_id": "MIX-004",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.017038508557457213,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2167,
+        "output_tokens": 201,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response fails to drive toward the missing fact (age confirmation) \u2014 it assumes age is satisfied (marks it \u2705) without asking, and instead casts unfounded doubt on the routing condition ('unclear whether a multi-leg booking with non-Swiss intermediate legs would be fully covered'), which over-reads the corpus. It also recommends contacting SWISS rather than committing to a yes/no upon age confirmation. Citation to 'Pay per invoice' section is correct. Minor fabrication risk in framing multi-leg coverage as uncertain beyond what the corpus states.",
+      "task_id": "MIX-005",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.017368928916050175,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2401,
+        "output_tokens": 264,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 0.5,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 0.5,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "Response correctly verifies both facts independently: LX0000 is cancelled, and booking 0002D8 contains LX0136/CX0047, not LX0000. It explicitly flags and refuses the 877-5O7-7341 fabrication. However, it does not cite the faq-payment refund-currency rule as expected, instead refusing all FAQ content \u2014 partial credit on citation accuracy.",
+      "task_id": "MIX-006",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.02938438263703014,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2573,
+        "output_tokens": 198,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.5,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 0.5,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "The response correctly states currency conversion is NOT available for flight changes and identifies OSL as the departure, citing both Payment and Booking and Cancellation sections (a plus per rubric). However, it over-commits to NOK ('Norwegian Krone (NOK)') without surfacing that this is an inference, since the corpus doesn't map airports to currencies \u2014 this is explicitly flagged as partial credit in the factual_correctness rubric.",
+      "task_id": "MIX-007",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.02125444608310922,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2232,
+        "output_tokens": 213,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "The response correctly identifies TK0065 as codeshare-restricted for SWISS seat selection and confirms LX0082 (SWISS-operated) allows it, citing the European fare concept FAQ verbatim. It suggests the actionable workaround of contacting Turkish Airlines directly without inventing URLs, fees, or fabricated processes.",
+      "task_id": "MIX-008",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.019049143588922682,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2210,
+        "output_tokens": 185,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 0.0,
+      "citation_accuracy": 0.0,
+      "no_fabrication": 0.0,
+      "raw_scores": {
+        "factual_correctness": 0.0,
+        "citation_accuracy": 0.0,
+        "no_fabrication": 0.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": null,
+      "rationale": "The response fabricates a self-service cancellation flow ('Log in at swiss.com \u2192 My Bookings \u2192 click Cancel') not supported by the verified corpus, and invents fare sub-type distinctions (Economy Light/Classic/Flex) that echo the suspect section. It fails to cite ## Booking and Cancellation or acknowledge that the corpus does not document cancellation. While it commendably flags the suspect phone number, the invented self-service steps and fare tiers constitute fabrication.",
+      "task_id": "EDGE-001",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.02640105604224169,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 861,
+        "output_tokens": 222,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 2305
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 1.0,
+      "no_fabrication": 1.0,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 1.0,
+        "no_fabrication": 1.0
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": true,
+      "task_passed_raw": true,
+      "rationale": "Response surfaces both the 90-day and 100-day cutoffs explicitly, correctly states CHF 30 fee with max 5 confirmations, cites both ## Ordering an invoice and ## Invoice Questions, and recommends the conservative 90-day window \u2014 matching the best-form rubric expectation. No invented timings, fees, or conditions.",
+      "task_id": "EDGE-002",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.01724737464357744,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2548,
+        "output_tokens": 185,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    },
+    {
+      "factual_correctness": 1.0,
+      "citation_accuracy": 0.5,
+      "no_fabrication": 0.5,
+      "raw_scores": {
+        "factual_correctness": 1.0,
+        "citation_accuracy": 0.5,
+        "no_fabrication": 0.5
+      },
+      "coerced_dims": [],
+      "off_grid_dims": [],
+      "task_passed": false,
+      "task_passed_raw": false,
+      "rationale": "Response correctly confirms the Comfort segment on SQ0114 and clearly states the corpus does not document Comfort features. However, it references the FAQ content generically without explicitly citing 'European fare concept' by name, and it speculatively equates Comfort with 'Singapore Airlines' Comfort/Premium Economy policies' \u2014 implying Comfort \u2248 Premium Economy without qualifying it as a guess outside the corpus, which the rubric flags as wrong.",
+      "task_id": "EDGE-003",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "gate_breach": false,
+      "gate_ratio": 0.019338692552707416,
+      "stop_reason": "end_turn",
+      "attempts": 1,
+      "judge_usage": {
+        "input_tokens": 2620,
+        "output_tokens": 225,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      }
+    }
+  ],
+  "errors": []
+}
