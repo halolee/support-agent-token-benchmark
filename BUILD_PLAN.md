@@ -155,10 +155,21 @@ Three architectures measured, comparison report populated with real numbers, adv
 - Option B (rejected) — `--cached` flag on the existing Naive RAG agent. Would conflate two architectures behind one identity in the judge and analysis paths.
 
 **Step 12 sweep protocol — DECIDED 2026-06-04: Option Y (cost-only, no re-judge).**
-- **Option Y (chosen) — Cached RAG alone (51 dispatches), append-only, agent-side cost measurement only.** No judge re-run. Quality is asserted equivalent to Naive RAG by construction: prompt caching changes input-token *pricing*, not the tokens the model sees, and Sonnet 4.6 at `temperature=0.0` is deterministic on identical inputs. A 3-task spot-check (bit-identical responses to Naive RAG) is sufficient to validate the equivalence claim before reporting cost numbers. Estimated cost: ~$1.50 (agent sweep only; no $5 judge sweep).
+- **Option Y (chosen) — Cached RAG alone (17 tasks × 3 runs = 51 dispatches), append-only, agent-side cost measurement only.** No judge re-run. Quality is asserted equivalent to Naive RAG by construction: prompt caching changes input-token *pricing*, not the tokens the model sees, and Sonnet 4.6 at `temperature=0.0` is deterministic on identical inputs. A 3-task spot-check (passing: caching fires + tool sequences match + responses semantically equivalent) is sufficient to validate the equivalence claim before reporting cost numbers. **Cost estimate revised 2026-06-04 from spot-check actuals: ~$2.60 total** (mean $0.0506/run × 51 runs). The earlier ~$1.50 placeholder undershot because it didn't account for ~3000 mean output tokens/task at $15/MTok. For reference, v1 Naive RAG agent sweep cost $2.79 on the same 51 runs; Cached RAG saves ~$0.21 (~7%) — the input cache is cheap but output dominates the bill at this workload size.
 - Option X (rejected for this phase) — full 4-arch re-sweep with re-judging. Saves the methodology asterisk on the alternating-runs protocol, but the v2 quality re-measurement series is going to re-sweep with a *blinded* judge anyway (Finding C3). Doing a non-blinded re-judge now would burn ~$5 and produce numbers that get superseded by v2. Deferred to v2 when C1–C3 loose ends are tightened — the re-sweep then carries both the caching variant AND the blinded judge in a single methodology-clean run.
 
 **Implication to document in `comparison.md`:** Phase 3 reports Cached RAG cost columns and explicitly carries forward Naive RAG's quality numbers (with a footnote: "Quality assumed equivalent to Naive RAG; bit-identical-response spot-check confirms determinism. Re-judging deferred to v2 quality series."). The cache matrix table notes Cached RAG quality as `= Naive RAG (by construction)` rather than as an independent measurement.
+
+**Pick-up point for next session (2026-06-04 EOD):** Step 11 + 11.5 shipped (commits `92047a4` + `f32ffe3`). Step 12 dispatch is pre-flighted — spot-check passed, gate fix in, cost confirmed. To launch the paid sweep:
+
+```
+.venv/bin/python -m measurement.runner \
+  --architectures cached_rag \
+  --runs 3 \
+  --results-dir runs/2026-06-04-phase3-step12-cached-only
+```
+
+(Uses default `measurement/tasks.jsonl` — all 17 frozen tasks.) Re-enable the API key first ([[reference-anthropic-console]]). Expected cost ~$2.60, runtime ~15 min. Article-worthy finding to expect: ~7% total-cost savings vs Naive RAG — the input cache is cheap but output tokens dominate, so caching shifts cost *shape* (input near-free, output unchanged) rather than collapsing total bill.
 
 **Process gotchas (carried forward from v1):**
 - `[[feedback-runner-report-clobbers-comparison]]` — do NOT run `python -m measurement.runner --report` until §11 template renderer ships (issue #42). Hand-edit `comparison.md`.
