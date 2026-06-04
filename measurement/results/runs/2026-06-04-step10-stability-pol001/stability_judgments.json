@@ -1,0 +1,196 @@
+{
+  "test": "judge-stability-pol001-hybrid-vs-naive",
+  "n_repeats": 5,
+  "judge_model": "claude-opus-4-7",
+  "judge_temperature": "default (opus-4-7 rejects parameter)",
+  "started_at": "2026-06-04T06:30:23.855179+00:00",
+  "targets": [
+    {
+      "task_id": "POL-001",
+      "architecture": "hybrid_rag",
+      "run_index": 0,
+      "original_verdict": "FAIL",
+      "original_scores": [
+        1.0,
+        1.0,
+        0.5
+      ],
+      "judgments": [
+        {
+          "repeat_index": 0,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility requirements are correctly stated and the pay-per-invoice section is cited. However, the response adds many specific details (24-48 hours, 15 days, CHF 15/25 reminder fees, 10-100% partial payment, ID scan + selfie, business address restriction) that may go beyond the corpus; without verification these specifics risk fabrication, warranting partial credit on no_fabrication.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1793,
+            "output_tokens": 203,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 1,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility criteria are correctly stated and the pay-per-invoice section is cited. However, specific details like '24\u201348 hours', '15 days', 'CHF 15/CHF 25 reminder fees', and '10%\u2013100% partial payment' may go beyond the corpus content, risking fabrication of payment terms and fees that the rubric specifically warns against.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1793,
+            "output_tokens": 189,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 2,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility criteria are correctly identified and the pay-per-invoice policy is cited. However, several specific details (24\u201348 hour invoice delivery, 15-day payment window, 10%\u2013100% partial payment range, CHF 15/25 reminder fees, ID scan + selfie requirement) may extend beyond what the corpus states and risk fabrication of payment terms and fees, which the rubric explicitly warns against.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1793,
+            "output_tokens": 209,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 3,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility criteria are correctly identified and the pay-per-invoice section is cited. However, specific details like '24\u201348 hours', '15 days', 'CHF 15/CHF 25 reminder fees', and '10%\u2013100% partial payment' may be fabricated or unverifiable additions beyond what the rubric expects, risking invented payment terms/fees.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1793,
+            "output_tokens": 189,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 4,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility criteria are correctly stated and the pay-per-invoice policy is cited. However, the response adds specific details like '24\u201348 hours', '15 days', 'CHF 15/CHF 25 reminder fees', and '10%\u2013100% partial payment' which may go beyond what the corpus states, risking fabrication of specific terms.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1793,
+            "output_tokens": 182,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        }
+      ],
+      "pass_rate": "0/5",
+      "pass_count": 0
+    },
+    {
+      "task_id": "POL-001",
+      "architecture": "naive_rag",
+      "run_index": 2,
+      "original_verdict": "PASS",
+      "original_scores": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "judgments": [
+        {
+          "repeat_index": 0,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 1.0,
+          "task_passed": true,
+          "rationale": "Response correctly identifies all three eligibility requirements (18+, CH/LI resident, flights from Switzerland) and cites the Pay per invoice section. Additional details about POWERPAY checks, invoice timing, and fees are standard pay-per-invoice corpus content, not fabricated.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1815,
+            "output_tokens": 157,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 1,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 1.0,
+          "task_passed": true,
+          "rationale": "The response correctly identifies all three eligibility requirements (18+, CH/LI resident, flights from Switzerland) and cites the Pay per invoice section. Additional details about POWERPAY, invoice timing, fees, and reminders are standard content from this FAQ section and not fabricated.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1815,
+            "output_tokens": 155,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 2,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three core eligibility requirements are correctly identified and the pay-per-invoice section is cited. However, the response adds specific details (24\u201348 hours invoice timing, 15-day payment window, 10\u2013100% partial payment, CHF 2.90 monthly fee, CHF 15/25 reminder fees, private address requirement) which may go beyond what the corpus states and risk fabrication of payment terms and fees.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1815,
+            "output_tokens": 204,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 3,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility criteria are correctly stated and the pay-per-invoice section is cited. However, the response adds specific numerical details (24-48 hours, 15 days, 10%-100% partial payment, CHF 2.90 monthly invoice, CHF 15/25 reminder fees) that may not all be supported by the corpus, risking fabrication of fees and payment terms beyond what the rubric allows.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1815,
+            "output_tokens": 204,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        },
+        {
+          "repeat_index": 4,
+          "factual_correctness": 1.0,
+          "citation_accuracy": 1.0,
+          "no_fabrication": 0.5,
+          "task_passed": false,
+          "rationale": "The three eligibility criteria are correctly stated and the pay-per-invoice section is cited. However, the response adds many specific details (24\u201348 hours invoice timing, 15-day payment window, 10\u2013100% partial payment, CHF 2.90 monthly invoice, CHF 15/25 reminder fees, private-address requirement) that risk fabrication beyond what the rubric expects and were not verified against the corpus snippet shown.",
+          "stop_reason": "end_turn",
+          "judge_usage": {
+            "input_tokens": 1815,
+            "output_tokens": 211,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0
+          }
+        }
+      ],
+      "pass_rate": "2/5",
+      "pass_count": 2
+    }
+  ],
+  "completed_at": "2026-06-04T06:30:59.859124+00:00",
+  "usage_totals": {
+    "input_tokens": 18040,
+    "output_tokens": 1903,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0
+  }
+}
