@@ -332,6 +332,27 @@ class TestGateRatio:
         }
         assert abs(_gate_ratio(record) - 0.02) < 1e-6
 
+    def test_prefers_explicit_processed_input_tokens_field(self):
+        """Records produced by record_run() since the field landed carry
+        processed_input_tokens directly. The gate should use that field
+        verbatim — not recompute from components, which would re-add
+        anything record_run already summed.
+        """
+        from measurement.runner import _gate_ratio
+
+        # Deliberately inconsistent: component sum (10283) != stored field
+        # (10000). The gate must trust the stored field. Ratio against the
+        # stored 10000 is |10175 - 10000| / 10000 = 1.75%.
+        record = {
+            "api_input_tokens": 4551,
+            "cache_creation_input_tokens": 2408,
+            "cache_read_input_tokens": 3324,
+            "processed_input_tokens": 10000,
+            "decomposition_input_sum": 9678,
+            "decomposition_input_sum_with_audit": 10175,
+        }
+        assert abs(_gate_ratio(record) - 0.0175) < 1e-4
+
 
 # =========================================================================
 # --report

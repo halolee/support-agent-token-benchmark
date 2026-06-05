@@ -48,7 +48,12 @@ except ImportError:
     pass
 
 from measurement.registry import ARCHITECTURE_REGISTRY, register_architecture
-from measurement.tokens import AGENT_MODEL, decompose_request, record_run
+from measurement.tokens import (
+    AGENT_MODEL,
+    decompose_request,
+    get_processed_input_tokens,
+    record_run,
+)
 
 
 # `ARCHITECTURE_REGISTRY` and `register_architecture` live in
@@ -243,15 +248,12 @@ def _gate_ratio(record: dict[str, Any]) -> float:
     input subset (Anthropic bills cache_creation and cache_read input
     tokens on separate counters). The count_tokens-derived decomposition
     sees the FULL prompt regardless of caching. So for an apples-to-apples
-    comparison the denominator must be (api_input + cache_create +
-    cache_read) — the total tokens actually processed by the model. The
-    fields default to 0 for non-caching architectures, so this is a no-op
-    for Naive RAG, Grep search, Hybrid RAG.
+    comparison the denominator is `processed_input_tokens` — the total
+    tokens actually processed by the model (METHODOLOGY §"Token
+    decomposition"). It collapses to `api_input_tokens` for Naive RAG,
+    Grep search, Hybrid RAG (cache fields zero).
     """
-    api_input = record["api_input_tokens"]
-    cache_create = record.get("cache_creation_input_tokens", 0) or 0
-    cache_read = record.get("cache_read_input_tokens", 0) or 0
-    total_processed = api_input + cache_create + cache_read
+    total_processed = get_processed_input_tokens(record)
     if total_processed == 0:
         return 0.0
     inclusive = record.get(
@@ -297,15 +299,15 @@ def _dispatch_one(
         ratio = _gate_ratio(record)
         record["gate_ratio"] = ratio
         record["gate_breach"] = ratio >= _GATE_TOLERANCE
-        cache_create = record.get("cache_creation_input_tokens", 0) or 0
-        cache_read = record.get("cache_read_input_tokens", 0) or 0
-        total_processed = record["api_input_tokens"] + cache_create + cache_read
+        processed = get_processed_input_tokens(record)
         if record["gate_breach"]:
+            cache_create = record.get("cache_creation_input_tokens", 0) or 0
+            cache_read = record.get("cache_read_input_tokens", 0) or 0
             print(
                 f"[gate-breach] arch={arch_name} task={task['task_id']} "
                 f"run={run_index + 1}/{runs_total} ratio={ratio:.1%} "
                 f"(api_input={record['api_input_tokens']}, cache_create={cache_create}, "
-                f"cache_read={cache_read}, total_processed={total_processed}, "
+                f"cache_read={cache_read}, processed_input={processed}, "
                 f"inclusive_sum={record.get('decomposition_input_sum_with_audit', record['decomposition_input_sum'])}) "
                 f"— flagged, not silenced per METHODOLOGY",
                 file=sys.stderr,
@@ -314,7 +316,7 @@ def _dispatch_one(
             f"[ok] arch={arch_name} task={task['task_id']} "
             f"run={run_index + 1}/{runs_total} "
             f"turns={record.get('turns', 1)} "
-            f"input={total_processed} "
+            f"input={processed} "
             f"output={record['api_output_tokens']} "
             f"gate={ratio:.1%}"
         )
@@ -528,17 +530,11 @@ def generate_report(
         runs = data.get("runs", [])
         if not runs:
             continue
-        # Caching-aware aggregation: for Cached RAG (and any future caching
-        # variant) the "input the model processed" includes cache_creation
-        # and cache_read tokens, not just standard-priced api_input. The
-        # `.get(..., 0) or 0` defaults make this a no-op for uncached
-        # architectures whose records carry cache_create=cache_read=0.
-        input_tokens = [
-            r["api_input_tokens"]
-            + (r.get("cache_creation_input_tokens", 0) or 0)
-            + (r.get("cache_read_input_tokens", 0) or 0)
-            for r in runs
-        ]
+        # Caching-aware aggregation: `processed_input_tokens` is the total
+        # input the model processed, summing standard + cache_creation +
+        # cache_read. Collapses to `api_input_tokens` for uncached
+        # architectures. Helper handles legacy records without the field.
+        input_tokens = [get_processed_input_tokens(r) for r in runs]
         output_tokens = [r["api_output_tokens"] for r in runs]
         rows.append(
             {

@@ -291,24 +291,47 @@ def record_run(
     """Build a structured record for one task-architecture-run.
 
     `decomposition_input_sum` is the sum of categories 1-4. METHODOLOGY
-    requires this to be within 5% of `api_input_tokens`; the runner
+    requires this to be within 5% of `processed_input_tokens`; the runner
     asserts this and flags discrepancies.
+
+    `processed_input_tokens` is the total input the model processed —
+    `api_input_tokens + cache_creation_input_tokens + cache_read_input_tokens`.
+    Collapses to `api_input_tokens` for uncached architectures (cache fields
+    zero); the gate denominator and report aggregations should reference this
+    field rather than recomputing the sum at each call site.
 
     `api_usage` should be an Anthropic Usage object (or any object with
     matching attributes). Cache fields default to 0 when absent.
     """
+    api_input = int(api_usage.input_tokens)
+    cache_create = int(getattr(api_usage, "cache_creation_input_tokens", 0) or 0)
+    cache_read = int(getattr(api_usage, "cache_read_input_tokens", 0) or 0)
     return {
         "architecture": architecture,
         "task_id": task_id,
         "decomposition": dict(decomposition),
         "decomposition_input_sum": sum(decomposition[k] for k in _INPUT_CATEGORIES),
-        "api_input_tokens": int(api_usage.input_tokens),
+        "api_input_tokens": api_input,
         "api_output_tokens": int(api_usage.output_tokens),
-        "cache_creation_input_tokens": int(
-            getattr(api_usage, "cache_creation_input_tokens", 0) or 0
-        ),
-        "cache_read_input_tokens": int(
-            getattr(api_usage, "cache_read_input_tokens", 0) or 0
-        ),
+        "cache_creation_input_tokens": cache_create,
+        "cache_read_input_tokens": cache_read,
+        "processed_input_tokens": api_input + cache_create + cache_read,
         "response_text": response_text,
     }
+
+
+def get_processed_input_tokens(record: dict[str, Any]) -> int:
+    """Return `processed_input_tokens` from a record, recomputing if absent.
+
+    Prefers the explicit field (records produced by `record_run` since the
+    field was added). Falls back to summing `api_input_tokens +
+    cache_creation_input_tokens + cache_read_input_tokens` so legacy
+    architecture_*.json from earlier runs still aggregate correctly.
+    """
+    if "processed_input_tokens" in record:
+        return int(record["processed_input_tokens"])
+    return (
+        int(record.get("api_input_tokens", 0) or 0)
+        + int(record.get("cache_creation_input_tokens", 0) or 0)
+        + int(record.get("cache_read_input_tokens", 0) or 0)
+    )

@@ -126,7 +126,7 @@ The architecture comparison lives in category ②. Categories ①, ③, ④ are 
 | ④ Tool call overhead          | 4,746 | 4,917 | 7,131 | 4,879 | Grep's tool overhead is +50% over naive/hybrid because grep's system prompt is included in the per-call overhead calculation; tool schemas alone are comparable. Cached matches Naive (identical tool schemas; `cache_control` on tools block adds minor overhead). |
 | ⑤ Agent intermediate          | 638   | 711   | 816   | 685   | Scales with turns: grep mean=4.63 turns vs naive=3.25, hybrid=3.35, cached=3.39. Grep's exploration pattern (multi-call keyword search) is the dominant driver |
 | ⑥ Response                    | 1,039 | 1,100 | 1,115 | 1,121 | Comparable across architectures — bounded by `max_tokens=1024`. Cached's +6% over Naive reflects temp=0-not-byte-identical drift, not a caching effect. |
-| **Total input (sum of ①-⑤)**  | **12,289** | **13,038** | **19,183** | **15,474** | Within 5% of API-reported `input_tokens` per decomposition assertion. For Cached RAG the displayed Total *excludes* audit_log tokens (~554 mean) for parity with the v1 columns — so naively comparing the displayed 13,038 to `api_input + cache_create + cache_read` (mean 13,863) shows a 5.95% gap. The per-record gate uses `decomposition_input_sum_with_audit` (audit-included) and sits at **mean 1.95%, max 3.47%** (MIX-006 run 0) — well under 5%. |
+| **Total input (sum of ①-⑤)**  | **12,289** | **13,038** | **19,183** | **15,474** | Within 5% of `processed_input_tokens` per decomposition assertion. For Cached RAG the displayed Total *excludes* audit_log tokens (~554 mean) for parity with the v1 columns — so naively comparing the displayed 13,038 to `processed_input_tokens` (mean 13,863) shows a 5.95% gap. The per-record gate uses `decomposition_input_sum_with_audit` (audit-included) and sits at **mean 1.95%, max 3.47%** (MIX-006 run 0) — well under 5%. |
 
 **Decomposition sanity:** category ② (retrieved/injected context) is the architecture's signature — vector_search returns less than hybrid_search (k=4 vs k=6 chunks), which returns less than grep_corpus (variable-size matched lines). The +18% hybrid/naive gap and the +66% grep/naive gap on ② are architectural by design, not implementation defects. Even with the five known Hybrid RAG bugs (#29-#32, #35), the k=6 cap on hybrid_search bounds ② — bug fixes change *which* chunks are returned, not *how many*.
 
@@ -134,7 +134,7 @@ The architecture comparison lives in category ②. Categories ①, ③, ④ are 
 
 ## Variance and reliability
 
-- **Coefficient of variation across 3 runs (per-task, on `api_input_tokens` — or `api_input + cache_create + cache_read` for Cached RAG):**
+- **Coefficient of variation across 3 runs (per-task, on `processed_input_tokens` — i.e. `api_input + cache_create + cache_read`, collapses to `api_input_tokens` for uncached architectures):**
   - Naive RAG: **6.3%** mean
   - Cached RAG: **7.6%** mean
   - Grep search: **14.9%** mean

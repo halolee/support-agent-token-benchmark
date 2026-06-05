@@ -156,6 +156,10 @@ For each task run, the following are recorded from the API response:
 | `cache_creation_input_tokens`  | API usage object (zero for Naive RAG / Grep search / Hybrid RAG, non-zero for Cached RAG) |
 | `cache_read_input_tokens`      | API usage object (zero for Naive RAG / Grep search / Hybrid RAG, non-zero for Cached RAG) |
 
+From these we derive one further field:
+
+- **`processed_input_tokens`** = `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`. The total input the model actually processed in one API call. Anthropic splits billing across three counters (standard / cache-create / cache-read) but the model sees one prompt; `processed_input_tokens` reunites them. Collapses to `input_tokens` for uncached architectures (cache fields zero). This is the canonical denominator for the 5% decomposition gate and for cross-architecture input-side comparisons — without it, every Cached-RAG reference would need a parenthetical "or `api_input + cache_create + cache_read`" caveat.
+
 These raw numbers are then decomposed into six categories — the original five from the [Silicon Data methodology](https://www.silicondata.com/blog/llm-cost-per-token) plus `agent_intermediate`, which we added in Phase 2 once multi-turn tool loops landed (see "Multi-turn extension" below):
 
 1. **System prompt tokens** — counted via Anthropic's `client.beta.messages.count_tokens()` API on the system prompt string
@@ -169,7 +173,7 @@ These raw numbers are then decomposed into six categories — the original five 
 
 This project does NOT use `tiktoken`. `tiktoken` is OpenAI's tokenizer and will produce wrong counts for Anthropic models. Use Anthropic's official `count_tokens` API for all input decomposition.
 
-The sum of categories 1–5 should approximately equal `input_tokens` reported by the API, within small variance for how messages are framed for the API call. The runner asserts this equality within 5% tolerance and flags discrepancies.
+The sum of categories 1–5 should approximately equal `processed_input_tokens` (i.e. the API-reported `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`), within small variance for how messages are framed for the API call. The runner asserts this equality within 5% tolerance and flags discrepancies. The cache-aware denominator matters for Cached RAG: `input_tokens` alone excludes cache-creation and cache-read portions, so summing categories 1–5 against `input_tokens` would over-state the ratio by ~30% for a cache-fired call. For uncached architectures the two denominators are equal.
 
 ### Multi-turn extension (`agent_intermediate`)
 
