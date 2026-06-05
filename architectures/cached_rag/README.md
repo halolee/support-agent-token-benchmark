@@ -37,7 +37,7 @@ If the observed drop is <30%, that's a finding about cache-hit rate under realis
 | `agent.py`     | Thin wrapper. Identical to Naive RAG's agent.py except `architecture="cached_rag"`. |
 | `tools.py`     | Tool definitions. Identical retrieval/booking/audit logic; one cache_control marker on a copy of AUDIT_TOOL_SCHEMA. |
 | `prompts.py`   | System prompt. Identical text; exported as a typed-block list with cache_control instead of a string. |
-| `setup_vector_store.py` | Identical to Naive RAG's. Builds the same BGE-M3 ChromaDB collection from `corpus/swiss_faq.md`. |
+| `setup_vector_store.py` | Thin wrapper around `architectures/_shared/vector_store_builder.py` (shared with Naive RAG). Builds the same BGE-M3 ChromaDB collection from `corpus/swiss_faq.md`; per-architecture paths/identifiers pinned in this module. |
 
 ## Modularity constraint compliance
 

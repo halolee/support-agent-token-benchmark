@@ -251,11 +251,11 @@ class TestGateRatio:
     """The decomposition gate compares the count_tokens-derived input sum to
     the API-reported "actually processed" total. Anthropic reports cache
     tokens on separate counters (cache_creation_input_tokens,
-    cache_read_input_tokens), so the gate denominator must be the SUM of
-    api_input + cache_create + cache_read — not api_input alone — otherwise
-    every cached_rag record trips a false-alarm breach. See METHODOLOGY
-    §"Cached RAG cost model" and the Phase 3 spot-check evidence on
-    2026-06-04 (three records all passing 5% under the corrected logic).
+    cache_read_input_tokens), so the gate denominator is `processed_input_tokens`
+    (= api_input + cache_create + cache_read) — not api_input alone —
+    otherwise every cached_rag record trips a false-alarm breach. See
+    METHODOLOGY §"What gets counted" and the Phase 3 spot-check evidence
+    on 2026-06-04 (three records all passing 5% under the corrected logic).
     """
 
     def test_uses_api_input_when_no_caching(self):
@@ -331,6 +331,27 @@ class TestGateRatio:
             "decomposition_input_sum_with_audit": 1020,
         }
         assert abs(_gate_ratio(record) - 0.02) < 1e-6
+
+    def test_prefers_explicit_processed_input_tokens_field(self):
+        """Records produced by record_run() since the field landed carry
+        processed_input_tokens directly. The gate should use that field
+        verbatim — not recompute from components, which would re-add
+        anything record_run already summed.
+        """
+        from measurement.runner import _gate_ratio
+
+        # Deliberately inconsistent: component sum (10283) != stored field
+        # (10000). The gate must trust the stored field. Ratio against the
+        # stored 10000 is |10175 - 10000| / 10000 = 1.75%.
+        record = {
+            "api_input_tokens": 4551,
+            "cache_creation_input_tokens": 2408,
+            "cache_read_input_tokens": 3324,
+            "processed_input_tokens": 10000,
+            "decomposition_input_sum": 9678,
+            "decomposition_input_sum_with_audit": 10175,
+        }
+        assert abs(_gate_ratio(record) - 0.0175) < 1e-4
 
 
 # =========================================================================
@@ -441,6 +462,7 @@ def _good_record(arch: str, task_id: str, *, api_input: int = 1500) -> dict:
         "api_output_tokens": 200,
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 0,
+        "processed_input_tokens": api_input,
         "response_text": "ok",
         "turns": 2,
         "tools_called": ["vector_search", "audit_log"],

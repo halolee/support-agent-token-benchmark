@@ -327,6 +327,120 @@ class TestRecordRun:
         assert record["cache_creation_input_tokens"] == 0
         assert record["cache_read_input_tokens"] == 0
 
+    def test_processed_input_tokens_uncached(self):
+        """For uncached architectures, processed_input_tokens == api_input_tokens."""
+        from measurement.tokens import record_run
+
+        api_usage = MagicMock(
+            input_tokens=1000,
+            output_tokens=200,
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=0,
+        )
+        record = record_run(
+            architecture="naive_rag",
+            task_id="POL-001",
+            decomposition={
+                "system_prompt": 500,
+                "retrieved_context": 300,
+                "user_message": 50,
+                "tool_overhead": 150,
+                "agent_intermediate": 0,
+                "response": 200,
+            },
+            api_usage=api_usage,
+            response_text="x",
+        )
+        assert record["processed_input_tokens"] == 1000
+        assert record["processed_input_tokens"] == record["api_input_tokens"]
+
+    def test_processed_input_tokens_cached(self):
+        """For Cached RAG, processed_input_tokens sums all three input counters."""
+        from measurement.tokens import record_run
+
+        api_usage = MagicMock(
+            input_tokens=4551,
+            output_tokens=200,
+            cache_creation_input_tokens=2408,
+            cache_read_input_tokens=3324,
+        )
+        record = record_run(
+            architecture="cached_rag",
+            task_id="POL-001",
+            decomposition={
+                "system_prompt": 500,
+                "retrieved_context": 300,
+                "user_message": 50,
+                "tool_overhead": 150,
+                "agent_intermediate": 9283,
+                "response": 200,
+            },
+            api_usage=api_usage,
+            response_text="x",
+        )
+        assert record["processed_input_tokens"] == 4551 + 2408 + 3324
+
+
+class TestGetProcessedInputTokens:
+    def test_prefers_explicit_field(self):
+        """If the record has processed_input_tokens, return it verbatim."""
+        from measurement.tokens import get_processed_input_tokens
+
+        # Deliberately inconsistent: component sum (50) != stored field (999).
+        # The helper must trust the stored field, not recompute, so callers
+        # get the value record_run() committed at write time.
+        record = {
+            "api_input_tokens": 10,
+            "cache_creation_input_tokens": 20,
+            "cache_read_input_tokens": 20,
+            "processed_input_tokens": 999,
+        }
+        assert get_processed_input_tokens(record) == 999
+
+    def test_falls_back_to_component_sum_for_legacy_records(self):
+        """Records written before the field was added still aggregate correctly."""
+        from measurement.tokens import get_processed_input_tokens
+
+        record = {
+            "api_input_tokens": 4551,
+            "cache_creation_input_tokens": 2408,
+            "cache_read_input_tokens": 3324,
+        }
+        assert get_processed_input_tokens(record) == 4551 + 2408 + 3324
+
+    def test_legacy_uncached_record_collapses_to_api_input(self):
+        from measurement.tokens import get_processed_input_tokens
+
+        record = {"api_input_tokens": 1000}
+        assert get_processed_input_tokens(record) == 1000
+
+    def test_none_cache_fields_treated_as_zero(self):
+        """JSON null in cache fields shouldn't crash the helper."""
+        from measurement.tokens import get_processed_input_tokens
+
+        record = {
+            "api_input_tokens": 1000,
+            "cache_creation_input_tokens": None,
+            "cache_read_input_tokens": None,
+        }
+        assert get_processed_input_tokens(record) == 1000
+
+    def test_none_explicit_field_falls_through_to_components(self):
+        """JSON null on the explicit processed_input_tokens field must not
+        crash — it falls through to the component-sum branch, same as a
+        missing key would. Without this, `int(None)` would raise TypeError
+        on hand-edited / partially-migrated records.
+        """
+        from measurement.tokens import get_processed_input_tokens
+
+        record = {
+            "processed_input_tokens": None,
+            "api_input_tokens": 1000,
+            "cache_creation_input_tokens": 200,
+            "cache_read_input_tokens": 300,
+        }
+        assert get_processed_input_tokens(record) == 1500
+
 
 # =========================================================================
 # Methodology gate — cassette pattern (record once, replay forever)
