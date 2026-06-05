@@ -177,7 +177,7 @@ Cost is contract-rate-dependent. Token ordering is mechanical (Anthropic API `us
 
 ### Per-class breakdown
 
-Token costs (median input tokens per dispatch, including failed) and pass rates (out of 3 runs per task). For Cached RAG, "input tokens" = `api_input + cache_create + cache_read` (total tokens the model processed, before caching discount).
+Token costs (median input tokens per dispatch, including failed) and pass rates (out of 3 runs per task). For Cached RAG, "input tokens" refers to `processed_input_tokens` (the total tokens the model processed before caching discount; see `METHODOLOGY.md` §"What gets counted" for the field definition). Collapses to `api_input_tokens` for the uncached architectures.
 
 | Class | Naive RAG tok / pass | Cached RAG tok / pass | Grep search tok / pass | Hybrid RAG tok / pass |
 |---|---:|---:|---:|---:|

@@ -301,13 +301,17 @@ def _dispatch_one(
         record["gate_breach"] = ratio >= _GATE_TOLERANCE
         processed = get_processed_input_tokens(record)
         if record["gate_breach"]:
-            cache_create = record.get("cache_creation_input_tokens", 0) or 0
-            cache_read = record.get("cache_read_input_tokens", 0) or 0
+            # Component fields are guaranteed ints by record_run; read
+            # them straight off the record rather than re-applying the
+            # `.get(..., 0) or 0` defensive pattern that the helper above
+            # exists to centralise.
             print(
                 f"[gate-breach] arch={arch_name} task={task['task_id']} "
                 f"run={run_index + 1}/{runs_total} ratio={ratio:.1%} "
-                f"(api_input={record['api_input_tokens']}, cache_create={cache_create}, "
-                f"cache_read={cache_read}, processed_input={processed}, "
+                f"(api_input={record['api_input_tokens']}, "
+                f"cache_create={record['cache_creation_input_tokens']}, "
+                f"cache_read={record['cache_read_input_tokens']}, "
+                f"processed_input={processed}, "
                 f"inclusive_sum={record.get('decomposition_input_sum_with_audit', record['decomposition_input_sum'])}) "
                 f"— flagged, not silenced per METHODOLOGY",
                 file=sys.stderr,
@@ -574,8 +578,10 @@ def generate_report(
             "Per the [Silicon Data model](https://www.silicondata.com/blog/llm-cost-per-token), "
             "extended with a sixth category (`agent_intermediate`) for multi-turn tool loops, "
             "every model call's token cost is the sum of five input categories and one output category. "
-            "The runner asserts that categories ①–⑤ sum to API-reported `input_tokens` "
-            "within 5%; discrepancies are flagged, not silenced "
+            "The runner asserts that categories ①–⑤ sum to `processed_input_tokens` "
+            "(= `api_input_tokens + cache_creation_input_tokens + cache_read_input_tokens`, "
+            "collapses to `api_input_tokens` for uncached architectures) within 5%; "
+            "discrepancies are flagged, not silenced "
             "(see `METHODOLOGY.md` §\"What gets counted\" and §\"Multi-turn extension\").",
             "",
             "```mermaid",
@@ -587,7 +593,7 @@ def generate_report(
             "    AI[\"⑤ Agent intermediate<br/>prior-turn assistant content (text + tool_use)<br/>re-sent every turn\"] -->|added per call| API",
             "    API -->|\"⑥ Response<br/>agent-set, varies per task\"| Out[Agent response]",
             "",
-            "    API ==> Assert{{\"input_tokens ≈ ① + ② + ③ + ④ + ⑤<br/>within 5% tolerance\"}}",
+            "    API ==> Assert{{\"processed_input_tokens ≈ ① + ② + ③ + ④ + ⑤<br/>within 5% tolerance\"}}",
             "```",
             "",
             "The architecture comparison lives in category ②. Categories ①, ③, ④ are "

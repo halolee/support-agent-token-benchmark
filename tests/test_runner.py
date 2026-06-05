@@ -251,11 +251,11 @@ class TestGateRatio:
     """The decomposition gate compares the count_tokens-derived input sum to
     the API-reported "actually processed" total. Anthropic reports cache
     tokens on separate counters (cache_creation_input_tokens,
-    cache_read_input_tokens), so the gate denominator must be the SUM of
-    api_input + cache_create + cache_read — not api_input alone — otherwise
-    every cached_rag record trips a false-alarm breach. See METHODOLOGY
-    §"Cached RAG cost model" and the Phase 3 spot-check evidence on
-    2026-06-04 (three records all passing 5% under the corrected logic).
+    cache_read_input_tokens), so the gate denominator is `processed_input_tokens`
+    (= api_input + cache_create + cache_read) — not api_input alone —
+    otherwise every cached_rag record trips a false-alarm breach. See
+    METHODOLOGY §"What gets counted" and the Phase 3 spot-check evidence
+    on 2026-06-04 (three records all passing 5% under the corrected logic).
     """
 
     def test_uses_api_input_when_no_caching(self):
@@ -462,6 +462,7 @@ def _good_record(arch: str, task_id: str, *, api_input: int = 1500) -> dict:
         "api_output_tokens": 200,
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 0,
+        "processed_input_tokens": api_input,
         "response_text": "ok",
         "turns": 2,
         "tools_called": ["vector_search", "audit_log"],

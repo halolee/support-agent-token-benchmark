@@ -425,6 +425,22 @@ class TestGetProcessedInputTokens:
         }
         assert get_processed_input_tokens(record) == 1000
 
+    def test_none_explicit_field_falls_through_to_components(self):
+        """JSON null on the explicit processed_input_tokens field must not
+        crash — it falls through to the component-sum branch, same as a
+        missing key would. Without this, `int(None)` would raise TypeError
+        on hand-edited / partially-migrated records.
+        """
+        from measurement.tokens import get_processed_input_tokens
+
+        record = {
+            "processed_input_tokens": None,
+            "api_input_tokens": 1000,
+            "cache_creation_input_tokens": 200,
+            "cache_read_input_tokens": 300,
+        }
+        assert get_processed_input_tokens(record) == 1500
+
 
 # =========================================================================
 # Methodology gate — cassette pattern (record once, replay forever)

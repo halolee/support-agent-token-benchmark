@@ -290,9 +290,11 @@ def record_run(
 ) -> dict[str, Any]:
     """Build a structured record for one task-architecture-run.
 
-    `decomposition_input_sum` is the sum of categories 1-4. METHODOLOGY
-    requires this to be within 5% of `processed_input_tokens`; the runner
-    asserts this and flags discrepancies.
+    `decomposition_input_sum` is the sum of input categories 1–5
+    (system_prompt, retrieved_context, user_message, tool_overhead,
+    agent_intermediate). METHODOLOGY requires this to be within 5% of
+    `processed_input_tokens`; the runner asserts this and flags
+    discrepancies.
 
     `processed_input_tokens` is the total input the model processed —
     `api_input_tokens + cache_creation_input_tokens + cache_read_input_tokens`.
@@ -327,9 +329,16 @@ def get_processed_input_tokens(record: dict[str, Any]) -> int:
     field was added). Falls back to summing `api_input_tokens +
     cache_creation_input_tokens + cache_read_input_tokens` so legacy
     architecture_*.json from earlier runs still aggregate correctly.
+
+    Treats an explicit `None` the same as a missing field — falls through
+    to the component sum. Without the None-collapse the explicit branch
+    would raise `TypeError: int() argument must not be NoneType` on
+    hand-edited / partially-migrated records, while the fallback branch
+    silently handled the same case on the cache counters.
     """
-    if "processed_input_tokens" in record:
-        return int(record["processed_input_tokens"])
+    value = record.get("processed_input_tokens")
+    if value is not None:
+        return int(value)
     return (
         int(record.get("api_input_tokens", 0) or 0)
         + int(record.get("cache_creation_input_tokens", 0) or 0)
