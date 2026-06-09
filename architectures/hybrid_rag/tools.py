@@ -265,7 +265,7 @@ def _rrf_fuse(
     seen_order = list(fused.keys())
     ranked_ids = sorted(
         seen_order,
-        key=lambda cid: (-fused_scores[cid], seen_order.index(cid)),
+        key=lambda cid: (-fused_scores[cid], cid), # neutral tie-break
     )
     return [fused[cid] for cid in ranked_ids]
 
