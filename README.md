@@ -4,6 +4,8 @@
 
 A measurement framework for comparing retrieval architectures used in LLM-based customer support agents, under realistic enterprise constraints. Built as the empirical foundation for a companion LinkedIn article on AI architecture trade-offs.
 
+An independent project-level verdict and pickup-ready remediation plan are available in [`PROJECT_EVALUATION.md`](PROJECT_EVALUATION.md). The evaluation positions v1 as a strong case study rather than a general-purpose benchmark and maps follow-up work to the repository structure.
+
 ## What this project is
 
 Four implementations of the same customer support task, measured head-to-head with the same task set, the same model, and the same cross-team modularity constraints:
